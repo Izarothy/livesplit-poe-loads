@@ -1,0 +1,41 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net481</TargetFramework>
+    <AssemblyName>LiveSplit.PoELoads</AssemblyName>
+    <RootNamespace>LiveSplit.PoELoads</RootNamespace>
+    <LangVersion>latest</LangVersion>
+    <UseWindowsForms>true</UseWindowsForms>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <GenerateAssemblyInfo>true</GenerateAssemblyInfo>
+    <Version>1.3.0</Version>
+    <Authors>Izarothy</Authors>
+    <!-- folder containing LiveSplit.exe: a LiveSplit folder next to this repo, or -p:LiveSplitDir=... -->
+    <LiveSplitDir Condition="'$(LiveSplitDir)' == ''">$(MSBuildThisFileDirectory)..\..\LiveSplit</LiveSplitDir>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Reference Include="LiveSplit.Core">
+      <HintPath>$(LiveSplitDir)\LiveSplit.Core.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UpdateManager">
+      <HintPath>$(LiveSplitDir)\UpdateManager.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="System.Windows.Forms" />
+    <Reference Include="System.Drawing" />
+    <Reference Include="System.Xml" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="Templates\entering.png" LogicalName="LiveSplit.PoELoads.Templates.entering.png" />
+    <EmbeddedResource Include="Templates\contacting.png" LogicalName="LiveSplit.PoELoads.Templates.contacting.png" />
+  </ItemGroup>
+
+  <!-- dotnet build -c Release -p:Install=true copies the component into LiveSplit (close LiveSplit first) -->
+  <Target Name="InstallComponent" AfterTargets="Build" Condition="'$(Install)' == 'true'">
+    <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(LiveSplitDir)\Components" />
+  </Target>
+
+</Project>

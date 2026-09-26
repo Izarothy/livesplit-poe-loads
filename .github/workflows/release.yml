@@ -1,0 +1,43 @@
+name: build
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download LiveSplit (build references only)
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release download --repo LiveSplit/LiveSplit --pattern "LiveSplit*.zip" --dir livesplit-download
+          Expand-Archive (Get-ChildItem livesplit-download -Filter *.zip | Select-Object -First 1).FullName -DestinationPath livesplit
+          $core = Get-ChildItem livesplit -Recurse -Filter LiveSplit.Core.dll | Select-Object -First 1
+          if (-not $core) { throw "LiveSplit.Core.dll not found in the LiveSplit release" }
+          "LIVESPLIT_DIR=$($core.DirectoryName)" >> $env:GITHUB_ENV
+
+      - name: Build
+        run: dotnet build src -c Release "-p:LiveSplitDir=${{ env.LIVESPLIT_DIR }}"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: LiveSplit.PoELoads
+          path: src/bin/Release/net481/LiveSplit.PoELoads.dll
+
+      - name: Publish release
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create $env:GITHUB_REF_NAME src/bin/Release/net481/LiveSplit.PoELoads.dll --title $env:GITHUB_REF_NAME --generate-notes
