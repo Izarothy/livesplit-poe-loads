@@ -167,7 +167,7 @@ namespace LiveSplit.PoELoads
                 var saved = loads.Where(l => l.Ict.HasValue).Sum(l => l.Ict.Value - NaIct(l))
                           + loads.Sum(l => l.LoadScreen - NaScreen(l));
                 var now = (state.CurrentTime[state.CurrentTimingMethod] ?? TimeSpan.Zero).TotalSeconds;
-                yield return ("on NA", Clock(Math.Max(0, now - saved)), "", null);
+                yield return ("on NA naively", Clock(Math.Max(0, now - saved)), "", null);
             }
             yield return ("Load time", none ? "-" : Clock(actual), "", null);
             yield return ("vs usual", none ? "-" : Signed(delta), none ? "" : Clock(par), none ? null : deltaColor);
@@ -283,7 +283,7 @@ namespace LiveSplit.PoELoads
             foreach (var row in Rows())
             {
                 var box = new RectangleF(SidePadding, y, width - 2 * SidePadding, RowHeight);
-                if (row.Label == "on NA")
+                if (row.Label == "on NA naively")
                 {
                     // a second timer: full width, set off from the load stats by a separator
                     DrawRow(g, state, box, row, 0);
