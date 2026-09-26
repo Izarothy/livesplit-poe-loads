@@ -161,6 +161,14 @@ namespace LiveSplit.PoELoads
             Color? deltaColor = Math.Abs(delta) < 0.05 ? (Color?)null
                 : delta > 0 ? layout.BehindLosingTimeColor : layout.AheadGainingTimeColor;
 
+            if (settings.ShowOnNa)
+            {
+                // this run's loads at NA speed: ICT where measured, and every loading screen
+                var saved = loads.Where(l => l.Ict.HasValue).Sum(l => l.Ict.Value - NaIct(l))
+                          + loads.Sum(l => l.LoadScreen - NaScreen(l));
+                var now = (state.CurrentTime[state.CurrentTimingMethod] ?? TimeSpan.Zero).TotalSeconds;
+                yield return ("on NA", Clock(Math.Max(0, now - saved)), none ? "" : Signed(-saved), null);
+            }
             yield return ("Load time", none ? "-" : Clock(actual), "", null);
             yield return ("vs usual", none ? "-" : Signed(delta), none ? "" : Clock(par), none ? null : deltaColor);
             yield return ("ICT", icts.Count == 0 ? "-" : Clock(icts.Sum()),
@@ -168,12 +176,26 @@ namespace LiveSplit.PoELoads
             yield return ("Load screens", none ? "-" : Clock(screens.Sum()), none ? "" : "avg " + Fixed(screens.Average()), null);
         }
 
+        // what an NA-realm runner gets for the same kind of load: averages over imexile's
+        // 118 transitions in an Exilecon 2026 qualifier race (US realm)
+        const double NaIctNew = 0.51, NaIctExisting = 0.15, NaIctLogout = 0.42;
+        const double NaScreenNew = 0.56, NaScreenExisting = 0.60, NaScreenLogout = 0.64;
+        const double ExistingInstanceIct = 0.55; // below this a zone change reused an existing instance
+
+        static double NaIct(Load load) =>
+            load.IsLogin ? NaIctLogout : load.Ict < ExistingInstanceIct ? NaIctExisting : NaIctNew;
+
+        static double NaScreen(Load load) =>
+            load.IsLogin ? NaScreenLogout : load.Ict < ExistingInstanceIct ? NaScreenExisting : NaScreenNew;
+
         static string Signed(double seconds) =>
             (seconds >= 0 ? "+" : "-") + Math.Abs(seconds).ToString("0.0", CultureInfo.InvariantCulture);
 
         static string Clock(double seconds)
         {
             var span = TimeSpan.FromSeconds(seconds);
+            if (span.TotalHours >= 1)
+                return $"{(int)span.TotalHours}:{span.Minutes:00}:{span.Seconds:00}.{span.Milliseconds / 100}";
             return span.TotalMinutes >= 1
                 ? $"{(int)span.TotalMinutes}:{span.Seconds:00}.{span.Milliseconds / 100}"
                 : seconds.ToString("0.0", CultureInfo.InvariantCulture);
@@ -230,9 +252,10 @@ namespace LiveSplit.PoELoads
         // ------------------------------------------------------------------ IComponent
 
         public string ComponentName => "PoE Loads";
-        public float VerticalHeight => RowHeight * 4;
+        int RowCount => settings.ShowOnNa ? 5 : 4;
+        public float VerticalHeight => RowHeight * RowCount;
         public float MinimumWidth => 120;
-        public float HorizontalWidth => 190 * 4;
+        public float HorizontalWidth => 190 * RowCount;
         public float MinimumHeight => RowHeight;
         public float PaddingTop => 0;
         public float PaddingBottom => 0;

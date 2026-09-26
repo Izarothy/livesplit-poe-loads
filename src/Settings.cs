@@ -22,6 +22,7 @@ namespace LiveSplit.PoELoads
         public string LogPath = "";           // empty: find it automatically
         public bool CaptureScreen = true;
         public bool SaveMissSnapshots = false; // debugging aid: keep the banner frame of each missed click
+        public bool ShowOnNa = false;          // extra row: the timer as it would read with NA-realm instance creation
 
         /// <summary>The configured Client.txt, or the running game's, or a default install location.</summary>
         public string ResolveLogPath()
@@ -50,6 +51,7 @@ namespace LiveSplit.PoELoads
             Add(document, root, "LogPath", LogPath);
             Add(document, root, "CaptureScreen", CaptureScreen.ToString());
             Add(document, root, "SaveMissSnapshots", SaveMissSnapshots.ToString());
+            Add(document, root, "ShowOnNa", ShowOnNa.ToString());
             return root;
         }
 
@@ -60,6 +62,8 @@ namespace LiveSplit.PoELoads
                 CaptureScreen = capture;
             if (bool.TryParse(node["SaveMissSnapshots"]?.InnerText, out var snapshots))
                 SaveMissSnapshots = snapshots;
+            if (bool.TryParse(node["ShowOnNa"]?.InnerText, out var onNa))
+                ShowOnNa = onNa;
         }
 
         static void Add(XmlDocument document, XmlElement parent, string name, string value)
@@ -100,9 +104,12 @@ namespace LiveSplit.PoELoads
             layout.Controls.Add(new Label { Text = "(empty = find automatically)", AutoSize = true, ForeColor = SystemColors.GrayText }, 1, 1);
             layout.Controls.Add(capture, 1, 2);
             layout.Controls.Add(snapshots, 1, 3);
+            var onNaBox = new CheckBox { Text = "Show \"on NA\": the timer with NA-speed instance creation and loading screens", Checked = settings.ShowOnNa, AutoSize = true };
+            onNaBox.CheckedChanged += (s, e) => settings.ShowOnNa = onNaBox.Checked;
+            layout.Controls.Add(onNaBox, 1, 4);
 
             Controls.Add(layout);
-            Size = new Size(460, 130);
+            Size = new Size(460, 155);
         }
     }
 }
