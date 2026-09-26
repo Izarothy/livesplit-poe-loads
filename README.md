@@ -2,7 +2,7 @@
 
 A LiveSplit component that shows how much of your Path of Exile run goes to zone transitions, live, split into the two parts you pay for every time:
 
-- **ICT** (instance creation time): from the click on a transition to the loading screen. The game shows "Entering <area>" the moment you click, so clicking a transition from a distance includes the time your character walks to it.
+- **ICT** (instance creation time): from the click on a transition ("Entering <area>" appears) to the loading screen. The instance is requested on the click, so walking around meanwhile doesn't change it.
 - **Load screens**: the loading screen itself.
 
 <img src="docs/layout.png" width="270" alt="LiveSplit layout with the PoE Loads rows under the timer">
