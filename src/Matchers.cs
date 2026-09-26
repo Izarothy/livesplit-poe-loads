@@ -2,6 +2,7 @@ using System;
 using System.Drawing;
 using System.Drawing.Imaging;
 using System.IO;
+using System.Linq;
 
 namespace LiveSplit.PoELoads
 {
@@ -111,11 +112,50 @@ namespace LiveSplit.PoELoads
         /// <summary>Best score over x in [xMin, xMax] and every row that fits.</summary>
         public float BestScore(Gray image, int xMin, int xMax)
         {
-            var best = -1f;
+            xMin = Math.Max(0, xMin);
             xMax = Math.Min(xMax, image.Width - Width);
+            var w = image.Width;
+            var pixels = image.Pixels;
+
+            // integral images of the pixels and their squares: window sums in O(1)
+            var stride = w + 1;
+            var sum = new double[stride * (image.Height + 1)];
+            var squares = new double[sum.Length];
+            for (var y = 0; y < image.Height; y++)
+            {
+                double rowSum = 0, rowSquares = 0;
+                for (var x = 0; x < w; x++)
+                {
+                    var p = pixels[y * w + x];
+                    rowSum += p;
+                    rowSquares += p * p;
+                    sum[(y + 1) * stride + x + 1] = sum[y * stride + x + 1] + rowSum;
+                    squares[(y + 1) * stride + x + 1] = squares[y * stride + x + 1] + rowSquares;
+                }
+            }
+
+            var n = Width * Height;
+            var best = -1f;
             for (var y = 0; y + Height <= image.Height; y++)
-                for (var x = Math.Max(0, xMin); x <= xMax; x++)
-                    best = Math.Max(best, ScoreAt(image, x, y));
+                for (var x = xMin; x <= xMax; x++)
+                {
+                    int a = y * stride + x, b = a + Width, c = (y + Height) * stride + x, d = c + Width;
+                    var windowSum = sum[d] - sum[b] - sum[c] + sum[a];
+                    var variance = squares[d] - squares[b] - squares[c] + squares[a] - windowSum * windowSum / n;
+                    if (variance <= 1e-6)
+                        continue;
+                    var dot = 0f;
+                    for (var ty = 0; ty < Height; ty++)
+                    {
+                        var row = (y + ty) * w + x;
+                        var trow = ty * Width;
+                        for (var tx = 0; tx < Width; tx++)
+                            dot += centered[trow + tx] * pixels[row + tx];
+                    }
+                    var score = (float)(dot / (norm * Math.Sqrt(variance)));
+                    if (score > best)
+                        best = score;
+                }
             return best;
         }
     }
@@ -128,14 +168,21 @@ namespace LiveSplit.PoELoads
     {
         // "Entering <area>" banner: 1080p rows 34..64, x 480..1440, matched at half resolution.
         public const int BannerWidth = 960, BannerHeight = 30, BannerTop = 34, BannerLeft = 480;
-        public const float BannerThreshold = 0.5f; // live non-banner frames stay under ~0.3
+        public const float BannerThreshold = 0.5f;      // starts a detection; live non-banner frames stay under ~0.3
+        public const float BannerKeepThreshold = 0.35f; // keeps one going when the game background flickers behind the text
 
-        // "Contacting server..." text: 1080p y 972..1052, x 700..1140, matched at quarter resolution.
-        public const int ContactWidth = 440, ContactHeight = 80, ContactTop = 972, ContactLeft = 700;
+        // "Contacting server..." box: 1080p y 972..1056, x 700..1180, matched at quarter resolution.
+        public const int ContactWidth = 480, ContactHeight = 84, ContactTop = 972, ContactLeft = 700;
         public const float ContactThreshold = 0.7f;
 
-        static readonly Template banner = new Template(Load("entering.png").Shrink(2));
-        static readonly Template contacting = new Template(Load("contacting.png"));
+        // the Bahnschrift UI font and the default font
+        static readonly Template[] banners =
+        {
+            new Template(Load("entering.png").Shrink(2)),
+            new Template(Load("entering_fontin.png").Shrink(2)),
+        };
+        static readonly Template contacting = new Template(Load("contacting.png"));              // whole text
+        static readonly Template contactingFontin = new Template(Load("contacting_fontin.png")); // right end of the box
 
         static Gray Load(string name)
         {
@@ -143,14 +190,31 @@ namespace LiveSplit.PoELoads
                 return Gray.FromPng(stream);
         }
 
+        const float FontLockScore = 0.75f;
+        static volatile int font = -1; // index into banners once the player's UI font is known
+
+        /// <summary>Forget the detected UI font (e.g. at the start of a run).</summary>
+        public static void ResetFont() => font = -1;
+
         /// <summary>Banner band at 1080p scale (960x30) -> score.</summary>
         public static float BannerScore(Gray band)
         {
             // the text is centred, so "Entering" starts left of the middle; x range in half-res pixels
-            return banner.BestScore(band.Shrink(2), 20, 245);
+            var half = band.Shrink(2);
+            if (font >= 0)
+                return banners[font].BestScore(half, 20, 245);
+            var scores = banners.Select(t => t.BestScore(half, 20, 245)).ToArray();
+            var best = Array.IndexOf(scores, scores.Max());
+            if (scores[best] >= FontLockScore)
+                font = best; // only check the font the player uses from now on
+            return scores[best];
         }
 
-        /// <summary>Contacting region at 1080p scale (440x80) -> score.</summary>
-        public static float ContactScore(Gray region) => contacting.ScoreAt(region.Shrink(4), 0, 0);
+        /// <summary>Contacting region at 1080p scale (480x84) -> score.</summary>
+        public static float ContactScore(Gray region)
+        {
+            var quarter = region.Shrink(4);
+            return Math.Max(contacting.ScoreAt(quarter, 0, 0), contactingFontin.ScoreAt(quarter, 63, 2));
+        }
     }
 }

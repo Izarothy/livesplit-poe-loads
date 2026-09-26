@@ -31,6 +31,8 @@
   <ItemGroup>
     <EmbeddedResource Include="Templates\entering.png" LogicalName="LiveSplit.PoELoads.Templates.entering.png" />
     <EmbeddedResource Include="Templates\contacting.png" LogicalName="LiveSplit.PoELoads.Templates.contacting.png" />
+    <EmbeddedResource Include="Templates\entering_fontin.png" LogicalName="LiveSplit.PoELoads.Templates.entering_fontin.png" />
+    <EmbeddedResource Include="Templates\contacting_fontin.png" LogicalName="LiveSplit.PoELoads.Templates.contacting_fontin.png" />
   </ItemGroup>
 
   <!-- dotnet build -c Release -p:Install=true copies the component into LiveSplit (close LiveSplit first) -->

@@ -22,7 +22,7 @@ namespace LiveSplit.PoELoads
     public sealed class ScreenWatcher : IDisposable
     {
         const int FrameMs = 16;
-        const int GapMs = 120;        // a cue missing for longer than this ends its episode
+        const int GapMs = 400;        // a cue missing for longer than this ends its episode (background flicker)
         const int KeepEpisodes = 32;
         const int KeepSamples = 600;  // ~10 s of banner scores, for diagnostics
         const int KeepImages = 240;   // ~4 s of banner frames, to save the best one when a click is missed
@@ -82,6 +82,7 @@ namespace LiveSplit.PoELoads
             {
                 banners.Clear();
                 contacts.Clear();
+                Cues.ResetFont();
                 samples.Clear();
                 images.Clear();
             }
@@ -185,7 +186,7 @@ namespace LiveSplit.PoELoads
                         var now = Now();
                         var band = capture.Banner();
                         var score = Cues.BannerScore(band);
-                        Track(banners, score >= Cues.BannerThreshold, now);
+                        Track(banners, score, Cues.BannerThreshold, Cues.BannerKeepThreshold, now);
                         var pixels = new byte[band.Pixels.Length];
                         for (var i = 0; i < pixels.Length; i++)
                             pixels[i] = (byte)Math.Min(255f, band.Pixels[i]);
@@ -199,7 +200,7 @@ namespace LiveSplit.PoELoads
                                 images.Dequeue();
                         }
                         if (contactArmed)
-                            Track(contacts, Cues.ContactScore(capture.Contact()) >= Cues.ContactThreshold, now);
+                            Track(contacts, Cues.ContactScore(capture.Contact()), Cues.ContactThreshold, Cues.ContactThreshold, now);
                     }
                 }
             }
@@ -209,14 +210,16 @@ namespace LiveSplit.PoELoads
             }
         }
 
-        void Track(List<Episode> episodes, bool visible, long now)
+        /// <summary>Start an episode at `start`; keep an ongoing one alive down to `keep` (hysteresis).</summary>
+        void Track(List<Episode> episodes, float score, float start, float keep, long now)
         {
-            if (!visible)
-                return;
             lock (sync)
             {
                 var last = episodes.Count > 0 ? episodes[episodes.Count - 1] : null;
-                if (last != null && now - last.LastSeen <= GapMs)
+                var ongoing = last != null && now - last.LastSeen <= GapMs;
+                if (score < (ongoing ? keep : start))
+                    return;
+                if (ongoing)
                 {
                     last.LastSeen = now;
                     return;

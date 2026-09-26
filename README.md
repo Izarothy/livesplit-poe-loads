@@ -2,7 +2,7 @@
 
 A LiveSplit component that shows how much of your Path of Exile run goes to zone transitions, live, split into the two parts you pay for every time:
 
-- **ICT** (instance creation time): from the click on a transition to the loading screen.
+- **ICT** (instance creation time): from the click on a transition to the loading screen. The game shows "Entering <area>" the moment you click, so clicking a transition from a distance includes the time your character walks to it.
 - **Load screens**: the loading screen itself.
 
 <img src="docs/layout.png" width="270" alt="LiveSplit layout with the PoE Loads rows under the timer">
@@ -37,7 +37,7 @@ The component counts from the moment the timer starts and keeps the last run's n
 
 - Windows, LiveSplit 1.8 or newer.
 - Game in **windowed or borderless** mode (exclusive fullscreen can capture black), 16:9. Tested at 1920×1080 and 2560×1440.
-- **English** game client with the **Bahnschrift** UI font (the on-screen text it looks for was captured with that font; other fonts will mostly show up as missed clicks).
+- **English** game client. Both the default UI font and the Bahnschrift UI font option are recognised.
 - If the game window is covered at the moment of a click, that load gets no ICT and shows up as `N?`. It does not skew **Load time** (the run's average ICT is used for it) or **vs usual** (only measured loads are compared).
 
 ## Settings

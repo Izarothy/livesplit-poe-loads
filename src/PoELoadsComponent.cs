@@ -277,7 +277,7 @@ namespace LiveSplit.PoELoads
             g.TextRenderingHint = layout.AntiAliasing ? TextRenderingHint.AntiAlias : TextRenderingHint.SingleBitPerPixel;
             using (var right = new StringFormat { Alignment = StringAlignment.Far, LineAlignment = StringAlignment.Center, FormatFlags = StringFormatFlags.NoWrap })
             using (var left = new StringFormat { Alignment = StringAlignment.Near, LineAlignment = StringAlignment.Center, FormatFlags = StringFormatFlags.NoWrap })
-            using (var muted = new SolidBrush(Color.FromArgb(150, layout.TextColor)))
+            using (var muted = new SolidBrush(Color.FromArgb(200, layout.TextColor)))
             using (var bright = new SolidBrush(row.ValueColor ?? layout.TextColor))
             {
                 g.DrawString(row.Label, layout.TextFont, muted, box, left);
