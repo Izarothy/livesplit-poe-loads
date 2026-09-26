@@ -100,6 +100,9 @@ namespace LiveSplit.PoELoads
                 switch (e.Kind)
                 {
                     case LogEventKind.Logout:
+                        // a logout while a loading screen is still up cuts that load short
+                        // (its log line still follows): leave it out of the stats
+                        current = null;
                         loginInProgress = true;
                         watcher.ContactArmed = true;
                         break;
