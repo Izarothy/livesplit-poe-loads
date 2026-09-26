@@ -167,12 +167,13 @@ namespace LiveSplit.PoELoads
                 var saved = loads.Where(l => l.Ict.HasValue).Sum(l => l.Ict.Value - NaIct(l))
                           + loads.Sum(l => l.LoadScreen - NaScreen(l));
                 var now = (state.CurrentTime[state.CurrentTimingMethod] ?? TimeSpan.Zero).TotalSeconds;
-                yield return ("on NA", Clock(Math.Max(0, now - saved)), none ? "" : Signed(-saved), null);
+                yield return ("on NA", Clock(Math.Max(0, now - saved)), "", null);
             }
             yield return ("Load time", none ? "-" : Clock(actual), "", null);
             yield return ("vs usual", none ? "-" : Signed(delta), none ? "" : Clock(par), none ? null : deltaColor);
-            yield return ("ICT", icts.Count == 0 ? "-" : Clock(icts.Sum()),
-                          icts.Count == 0 ? "" : "avg " + Fixed(icts.Average()) + (icts.Count < loads.Count ? $"  {loads.Count - icts.Count}?" : ""), null);
+            var missed = loads.Count - icts.Count;
+            yield return (missed > 0 ? $"ICT  ({missed}?)" : "ICT", icts.Count == 0 ? "-" : Clock(icts.Sum()),
+                          icts.Count == 0 ? "" : "avg " + Fixed(icts.Average()), null);
             yield return ("Load screens", none ? "-" : Clock(screens.Sum()), none ? "" : "avg " + Fixed(screens.Average()), null);
         }
 
@@ -276,25 +277,45 @@ namespace LiveSplit.PoELoads
 
         public void DrawVertical(Graphics g, LiveSplitState state, float width, Region clipRegion)
         {
+            var layout = state.LayoutSettings;
+            var detailColumn = DetailColumnWidth(g, layout.TimesFont);
             var y = 0f;
             foreach (var row in Rows())
             {
-                DrawRow(g, state, new RectangleF(SidePadding, y, width - 2 * SidePadding, RowHeight), row);
+                var box = new RectangleF(SidePadding, y, width - 2 * SidePadding, RowHeight);
+                if (row.Label == "on NA")
+                {
+                    // a second timer: full width, set off from the load stats by a separator
+                    DrawRow(g, state, box, row, 0);
+                    using (var pen = new Pen(layout.SeparatorsColor, 1))
+                        g.DrawLine(pen, 0, y + RowHeight - 1, width, y + RowHeight - 1);
+                }
+                else
+                {
+                    DrawRow(g, state, box, row, detailColumn);
+                }
                 y += RowHeight;
             }
         }
 
         public void DrawHorizontal(Graphics g, LiveSplitState state, float height, Region clipRegion)
         {
+            var detailColumn = DetailColumnWidth(g, state.LayoutSettings.TimesFont);
             var x = 0f;
             foreach (var row in Rows())
             {
-                DrawRow(g, state, new RectangleF(x + SidePadding, 0, 190 - 2 * SidePadding, height), row);
+                DrawRow(g, state, new RectangleF(x + SidePadding, 0, 190 - 2 * SidePadding, height), row, row.Detail.Length > 0 ? detailColumn : 0);
                 x += 190;
             }
         }
 
-        static void DrawRow(Graphics g, LiveSplitState state, RectangleF box, (string Label, string Value, string Detail, Color? ValueColor) row)
+        /// <summary>Room for the muted right column ("avg 0.00", "12:34.5") so every value lines up.</summary>
+        static float DetailColumnWidth(Graphics g, Font font) =>
+            Math.Max(g.MeasureString("avg 0.00", font, PointF.Empty, StringFormat.GenericTypographic).Width,
+                     g.MeasureString("00:00.0", font, PointF.Empty, StringFormat.GenericTypographic).Width) + 14;
+
+        static void DrawRow(Graphics g, LiveSplitState state, RectangleF box,
+                            (string Label, string Value, string Detail, Color? ValueColor) row, float detailColumn)
         {
             var layout = state.LayoutSettings;
             g.TextRenderingHint = layout.AntiAliasing ? TextRenderingHint.AntiAlias : TextRenderingHint.SingleBitPerPixel;
@@ -304,13 +325,9 @@ namespace LiveSplit.PoELoads
             using (var bright = new SolidBrush(row.ValueColor ?? layout.TextColor))
             {
                 g.DrawString(row.Label, layout.TextFont, muted, box, left);
-                var detailWidth = 0f;
                 if (row.Detail.Length > 0)
-                {
                     g.DrawString(row.Detail, layout.TimesFont, muted, box, right);
-                    detailWidth = g.MeasureString(row.Detail, layout.TimesFont, PointF.Empty, StringFormat.GenericTypographic).Width + 12;
-                }
-                g.DrawString(row.Value, layout.TimesFont, bright, new RectangleF(box.X, box.Y, box.Width - detailWidth, box.Height), right);
+                g.DrawString(row.Value, layout.TimesFont, bright, new RectangleF(box.X, box.Y, box.Width - detailColumn, box.Height), right);
             }
         }
 
