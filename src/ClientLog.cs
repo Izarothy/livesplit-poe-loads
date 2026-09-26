@@ -18,6 +18,7 @@ namespace LiveSplit.PoELoads
     {
         public LogEventKind Kind;
         public long Tick;       // Client.txt millisecond tick (system uptime)
+        public string AreaId;   // Generating only, e.g. "1_1_1"
         public string Area;     // LoadFinished only
         public double Seconds;  // LoadFinished only
     }
@@ -28,7 +29,7 @@ namespace LiveSplit.PoELoads
     public sealed class ClientLog
     {
         static readonly Regex Line = new Regex(@"^\d{4}/\d\d/\d\d \d\d:\d\d:\d\d (\d+) \S+ \[\w+ Client \d+\] (.*)$", RegexOptions.Compiled);
-        static readonly Regex Generating = new Regex(@"^Generating level \d+ area ""[^""]+""", RegexOptions.Compiled);
+        static readonly Regex Generating = new Regex(@"^Generating level \d+ area ""([^""]+)""", RegexOptions.Compiled);
         static readonly Regex LoadingScreen = new Regex(@"^\[LOADING SCREEN\] \((.*)\) Duration = ([\d.]+) seconds", RegexOptions.Compiled);
 
         readonly string path;
@@ -89,8 +90,9 @@ namespace LiveSplit.PoELoads
 
             if (message.StartsWith("Abnormal disconnect") || message.StartsWith("Async connecting to"))
                 return new LogEvent { Kind = LogEventKind.Logout, Tick = tick };
-            if (Generating.IsMatch(message))
-                return new LogEvent { Kind = LogEventKind.Generating, Tick = tick };
+            var generating = Generating.Match(message);
+            if (generating.Success)
+                return new LogEvent { Kind = LogEventKind.Generating, Tick = tick, AreaId = generating.Groups[1].Value };
             var loading = LoadingScreen.Match(message);
             if (loading.Success)
                 return new LogEvent

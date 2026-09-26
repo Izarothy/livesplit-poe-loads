@@ -16,7 +16,7 @@ namespace LiveSplit.PoELoads
         const int RecentRuns = 10;
         const int MinimumLoadsPerRun = 5;
 
-        static readonly Regex Row = new Regex(@"^\d+,(zone|login),"".*"",([\d.]*),([\d.]+)(,.*)?$", RegexOptions.Compiled);
+        static readonly Regex Row = new Regex(@"^\d+,(zone|login),""(.*)"",([\d.]*),([\d.]+)(,.*)?$", RegexOptions.Compiled);
 
         public double ZoneIct = 0.70, ZoneScreen = 1.20;
         public double LoginIct = 0.65, LoginScreen = 1.45;
@@ -63,12 +63,12 @@ namespace LiveSplit.PoELoads
                 foreach (var line in File.ReadLines(file).Skip(1))
                 {
                     var match = Row.Match(line.Trim());
-                    if (!match.Success)
+                    if (!match.Success || match.Groups[2].Value == "The Twilight Strand") // saved by older versions
                         continue;
-                    var ict = match.Groups[2].Value.Length > 0
-                        ? double.Parse(match.Groups[2].Value, CultureInfo.InvariantCulture)
+                    var ict = match.Groups[3].Value.Length > 0
+                        ? double.Parse(match.Groups[3].Value, CultureInfo.InvariantCulture)
                         : (double?)null;
-                    rows.Add((match.Groups[1].Value, ict, double.Parse(match.Groups[3].Value, CultureInfo.InvariantCulture)));
+                    rows.Add((match.Groups[1].Value, ict, double.Parse(match.Groups[4].Value, CultureInfo.InvariantCulture)));
                 }
             }
             catch (IOException) { }

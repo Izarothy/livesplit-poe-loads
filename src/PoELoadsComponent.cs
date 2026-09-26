@@ -49,6 +49,7 @@ namespace LiveSplit.PoELoads
     public sealed class PoELoadsComponent : IComponent
     {
         const double PollSeconds = 0.1;
+        const string NewCharacterArea = "1_1_1"; // The Twilight Strand
         const float RowHeight = 30;
         const float SidePadding = 7;
 
@@ -101,6 +102,13 @@ namespace LiveSplit.PoELoads
                     case LogEventKind.Logout:
                         loginInProgress = true;
                         watcher.ContactArmed = true;
+                        break;
+
+                    case LogEventKind.Generating when e.AreaId == NewCharacterArea:
+                        // a new character entering The Twilight Strand starts a run; it is not a load of one
+                        current = null;
+                        loginInProgress = false;
+                        watcher.ContactArmed = false;
                         break;
 
                     case LogEventKind.Generating:
