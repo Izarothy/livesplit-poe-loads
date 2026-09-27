@@ -60,13 +60,17 @@ namespace LiveSplit.PoELoads
             var rows = new List<(string, double?, double)>();
             try
             {
-                foreach (var line in File.ReadLines(file).Skip(1))
+                var lines = File.ReadLines(file).ToList();
+                // files without the "ict_to" column (before 1.4) measured ICT up to "Generating level",
+                // on average this much after the loading screen really appears ("Got Instance Details")
+                var offset = lines.Count > 0 && lines[0].Contains("ict_to") ? 0 : 0.107;
+                foreach (var line in lines.Skip(1))
                 {
                     var match = Row.Match(line.Trim());
                     if (!match.Success || match.Groups[2].Value == "The Twilight Strand") // saved by older versions
                         continue;
                     var ict = match.Groups[3].Value.Length > 0
-                        ? double.Parse(match.Groups[3].Value, CultureInfo.InvariantCulture)
+                        ? Math.Max(0, double.Parse(match.Groups[3].Value, CultureInfo.InvariantCulture) - offset)
                         : (double?)null;
                     rows.Add((match.Groups[1].Value, ict, double.Parse(match.Groups[4].Value, CultureInfo.InvariantCulture)));
                 }

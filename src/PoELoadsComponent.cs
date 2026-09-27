@@ -219,7 +219,7 @@ namespace LiveSplit.PoELoads
             {
                 Directory.CreateDirectory(RunFolder);
                 var file = Path.Combine(RunFolder, DateTime.Now.ToString("yyyy-MM-dd HH-mm-ss", CultureInfo.InvariantCulture) + ".csv");
-                File.WriteAllText(file, "n,kind,area,ict_s,loadscreen_s,banner_best,banner_frames\r\n");
+                File.WriteAllText(file, "n,kind,area,ict_s,loadscreen_s,banner_best,banner_frames,ict_to\r\n");
                 return file;
             }
             catch (IOException) { return null; }
@@ -250,7 +250,7 @@ namespace LiveSplit.PoELoads
             var line = string.Join(",", loads.Count, load.IsLogin ? "login" : "zone", "\"" + load.Area.Replace("\"", "\"\"") + "\"",
                                    ict, load.LoadScreen.ToString("0.000", CultureInfo.InvariantCulture),
                                    float.IsNaN(load.BannerBest) ? "" : load.BannerBest.ToString("0.00", CultureInfo.InvariantCulture),
-                                   load.BannerFrames);
+                                   load.BannerFrames, "loadscreen");
             try { File.AppendAllText(runFile, line + "\r\n"); }
             catch (IOException) { }
         }
