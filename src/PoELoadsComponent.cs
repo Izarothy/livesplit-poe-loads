@@ -25,7 +25,7 @@ namespace LiveSplit.PoELoads
         public string UpdateName => ComponentName;
         public string XMLURL => "";
         public string UpdateURL => "";
-        public Version Version => new Version(1, 3, 0);
+        public Version Version => new Version(1, 4, 0);
     }
 
     /// <summary>One finished transition of the current run.</summary>
@@ -115,29 +115,31 @@ namespace LiveSplit.PoELoads
                         break;
 
                     case LogEventKind.Generating:
-                        var onset = watcher.OnsetBefore(e.Tick, loginInProgress);
-                        var ict = onset.HasValue ? (e.Tick - onset.Value) / 1000.0 : (double?)null;
-                        var (best, frames) = watcher.BannerStats(e.Tick - 3000, e.Tick);
-                        if (settings.SaveMissSnapshots && !loginInProgress && ict == null && frames > 0)
-                            SaveMiss(e.Tick);
-                        current = new Load
-                        {
-                            IsLogin = loginInProgress,
-                            Ict = ict >= 0 && ict < 60 ? ict : null,
-                            BannerBest = best,
-                            BannerFrames = frames,
-                        };
+                        current = new Load { IsLogin = loginInProgress };
                         loginInProgress = false;
                         watcher.ContactArmed = false;
                         break;
 
                     case LogEventKind.LoadFinished when current != null:
+                    {
+                        // the loading screen appears at "Got Instance Details", ~0.1 s before "Generating level";
+                        // its logged duration runs from there, so its start is this line's tick minus the duration
+                        var loadStart = e.Tick - (long)Math.Round(e.Seconds * 1000);
+                        var onset = watcher.OnsetBefore(loadStart, current.IsLogin);
+                        var ict = onset.HasValue ? (loadStart - onset.Value) / 1000.0 : (double?)null;
+                        var (best, frames) = watcher.BannerStats(loadStart - 3000, loadStart);
+                        if (settings.SaveMissSnapshots && !current.IsLogin && ict == null && frames > 0)
+                            SaveMiss(loadStart);
+                        current.Ict = ict >= 0 && ict < 60 ? ict : null;
+                        current.BannerBest = best;
+                        current.BannerFrames = frames;
                         current.Area = e.Area;
                         current.LoadScreen = e.Seconds;
                         loads.Add(current);
                         Append(current);
                         current = null;
                         break;
+                    }
                 }
             }
         }

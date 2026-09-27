@@ -25,7 +25,7 @@ namespace LiveSplit.PoELoads
         const int GapMs = 400;        // a cue missing for longer than this ends its episode (background flicker)
         const int KeepEpisodes = 32;
         const int KeepSamples = 600;  // ~10 s of banner scores, for diagnostics
-        const int KeepImages = 240;   // ~4 s of banner frames, to save the best one when a click is missed
+        const int KeepImages = 480;   // ~8 s of banner frames, to save the best one when a click is missed
 
         static readonly string[] ProcessNames =
         {
