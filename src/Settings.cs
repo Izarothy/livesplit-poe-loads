@@ -23,6 +23,7 @@ namespace LiveSplit.PoELoads
         public bool CaptureScreen = true;
         public bool SaveMissSnapshots = false; // debugging aid: keep the banner frame of each missed click
         public bool ShowOnNa = false;          // extra row: the timer as it would read with NA-realm instance creation
+        public bool WriteDiagnostics = false;  // troubleshooting: report what the screen watcher sees (PoELoads\diagnostics)
 
         /// <summary>The configured Client.txt, or the running game's, or a default install location.</summary>
         public string ResolveLogPath()
@@ -52,6 +53,7 @@ namespace LiveSplit.PoELoads
             Add(document, root, "CaptureScreen", CaptureScreen.ToString());
             Add(document, root, "SaveMissSnapshots", SaveMissSnapshots.ToString());
             Add(document, root, "ShowOnNa", ShowOnNa.ToString());
+            Add(document, root, "WriteDiagnostics", WriteDiagnostics.ToString());
             return root;
         }
 
@@ -64,6 +66,8 @@ namespace LiveSplit.PoELoads
                 SaveMissSnapshots = snapshots;
             if (bool.TryParse(node["ShowOnNa"]?.InnerText, out var onNa))
                 ShowOnNa = onNa;
+            if (bool.TryParse(node["WriteDiagnostics"]?.InnerText, out var diagnostics))
+                WriteDiagnostics = diagnostics;
         }
 
         static void Add(XmlDocument document, XmlElement parent, string name, string value)
@@ -107,9 +111,12 @@ namespace LiveSplit.PoELoads
             var onNaBox = new CheckBox { Text = "Show \"on NA\": the timer with NA-speed instance creation and loading screens", Checked = settings.ShowOnNa, AutoSize = true };
             onNaBox.CheckedChanged += (s, e) => settings.ShowOnNa = onNaBox.Checked;
             layout.Controls.Add(onNaBox, 1, 4);
+            var diagnosticsBox = new CheckBox { Text = "Write diagnostics while the timer runs (PoELoads\\diagnostics)", Checked = settings.WriteDiagnostics, AutoSize = true };
+            diagnosticsBox.CheckedChanged += (s, e) => settings.WriteDiagnostics = diagnosticsBox.Checked;
+            layout.Controls.Add(diagnosticsBox, 1, 5);
 
             Controls.Add(layout);
-            Size = new Size(460, 155);
+            Size = new Size(460, 180);
         }
     }
 }

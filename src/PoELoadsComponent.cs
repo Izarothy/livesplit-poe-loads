@@ -25,7 +25,7 @@ namespace LiveSplit.PoELoads
         public string UpdateName => ComponentName;
         public string XMLURL => "";
         public string UpdateURL => "";
-        public Version Version => new Version(1, 4, 0);
+        public Version Version => new Version(1, 4, 1);
     }
 
     /// <summary>One finished transition of the current run.</summary>
@@ -84,6 +84,9 @@ namespace LiveSplit.PoELoads
             log.SkipToEnd();
             usual = Baseline.FromHistory(RunFolder); // before this run's file exists
             runFile = NewRunFile();
+            watcher.Diagnostics = settings.WriteDiagnostics && runFile != null
+                ? new Diagnostics(Path.Combine(RunFolder, "diagnostics", Path.GetFileNameWithoutExtension(runFile)))
+                : null;
         }
 
         bool Running => state.CurrentPhase == TimerPhase.Running || state.CurrentPhase == TimerPhase.Paused;
@@ -239,6 +242,7 @@ namespace LiveSplit.PoELoads
                 watcher.SaveBestBanner(generateTick - 3000, generateTick, Path.Combine(folder, name));
             }
             catch (IOException) { }
+            catch (UnauthorizedAccessException) { }
             catch (System.Runtime.InteropServices.ExternalException) { }
         }
 

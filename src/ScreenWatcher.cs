@@ -69,6 +69,9 @@ namespace LiveSplit.PoELoads
             }
         }
 
+        /// <summary>Write a troubleshooting report while capturing (null = off).</summary>
+        public volatile Diagnostics Diagnostics;
+
         /// <summary>A login is in progress: also watch for "Contacting server".</summary>
         public bool ContactArmed
         {
@@ -158,6 +161,8 @@ namespace LiveSplit.PoELoads
                 {
                     var window = IntPtr.Zero;
                     var lastLookup = 0L;
+                    var lastReport = -(long)PoELoads.Diagnostics.ReportMs;
+                    var lastScore = float.NaN;
                     var clock = Stopwatch.StartNew();
                     var next = 0L;
                     while (!disposed)
@@ -180,12 +185,21 @@ namespace LiveSplit.PoELoads
                             window = findWindow();
                             lastLookup = clock.ElapsedMilliseconds;
                         }
-                        if (window == IntPtr.Zero || !capture.Locate(window) || (requireVisible && !capture.BannerVisible(window)))
+                        var located = window != IntPtr.Zero && capture.Locate(window);
+                        var visible = located && (!requireVisible || capture.BannerVisible(window));
+                        var diagnostics = Diagnostics;
+                        if (diagnostics != null && clock.ElapsedMilliseconds - lastReport >= PoELoads.Diagnostics.ReportMs)
+                        {
+                            lastReport = clock.ElapsedMilliseconds;
+                            diagnostics.Report(window, capture, located, visible, lastScore);
+                        }
+                        if (!visible)
                             continue;
 
                         var now = Now();
                         var band = capture.Banner();
                         var score = Cues.BannerScore(band);
+                        lastScore = score;
                         Track(banners, score, Cues.BannerThreshold, Cues.BannerKeepThreshold, now);
                         var pixels = new byte[band.Pixels.Length];
                         for (var i = 0; i < pixels.Length; i++)
@@ -277,26 +291,55 @@ namespace LiveSplit.PoELoads
         /// <summary>True when the game window, not something on top of it, is at the banner's position.</summary>
         public bool BannerVisible(IntPtr window)
         {
-            var point = new POINT
-            {
-                X = left + (Cues.BannerLeft + Cues.BannerWidth / 2) * width / 1920,
-                Y = top + (Cues.BannerTop + Cues.BannerHeight / 2) * height / 1080,
-            };
-            return GetAncestor(WindowFromPoint(point), GA_ROOT) == window;
+            var point = BannerPoint;
+            return GetAncestor(WindowFromPoint(new POINT { X = point.X, Y = point.Y }), GA_ROOT) == window;
         }
+
+        public System.Drawing.Point BannerPoint => new System.Drawing.Point(
+            left + (Cues.BannerLeft + Cues.BannerWidth / 2) * width / 1920,
+            top + (Cues.BannerTop + Cues.BannerHeight / 2) * height / 1080);
+
+        public System.Drawing.Rectangle Client => new System.Drawing.Rectangle(left, top, width, height);
+
+        public System.Drawing.Rectangle BannerRect => ScreenRect(banner, Cues.BannerLeft, Cues.BannerTop);
+
         public Gray Contact() => Grab(contact, Cues.ContactLeft, Cues.ContactTop);
+
+        /// <summary>The whole client area as currently captured, scaled to at most `maxWidth` wide (diagnostics).</summary>
+        public System.Drawing.Bitmap Frame(int maxWidth)
+        {
+            if (width <= 0 || height <= 0)
+                return null;
+            var w = Math.Min(maxWidth, width);
+            var h = Math.Max(1, height * w / width);
+            using (var region = new Region(w, h))
+            {
+                StretchBlt(region.Dc, 0, 0, w, h, screen, left, top, width, height, SRCCOPY);
+                var bitmap = new System.Drawing.Bitmap(w, h, System.Drawing.Imaging.PixelFormat.Format32bppRgb);
+                var data = bitmap.LockBits(new System.Drawing.Rectangle(0, 0, w, h), System.Drawing.Imaging.ImageLockMode.WriteOnly, bitmap.PixelFormat);
+                var bytes = new byte[w * h * 4];
+                Marshal.Copy(region.Bits, bytes, 0, bytes.Length);
+                for (var row = 0; row < h; row++)
+                    Marshal.Copy(bytes, row * w * 4, data.Scan0 + row * data.Stride, w * 4);
+                bitmap.UnlockBits(data);
+                return bitmap;
+            }
+        }
+
+        // 1080p reference coordinates, scaled to the actual client size (16:9 assumed, as in the video tool)
+        System.Drawing.Rectangle ScreenRect(Region region, int left1080, int top1080) => new System.Drawing.Rectangle(
+            left + left1080 * width / 1920,
+            top + top1080 * height / 1080,
+            region.Width * width / 1920,
+            region.Height * height / 1080);
 
         Gray Grab(Region region, int left1080, int top1080)
         {
-            // 1080p reference coordinates, scaled to the actual client size (16:9 assumed, as in the video tool)
-            var x = left + left1080 * width / 1920;
-            var y = top + top1080 * height / 1080;
-            var w = region.Width * width / 1920;
-            var h = region.Height * height / 1080;
-            if (w == region.Width && h == region.Height)
-                BitBlt(region.Dc, 0, 0, w, h, screen, x, y, SRCCOPY);
+            var r = ScreenRect(region, left1080, top1080);
+            if (r.Width == region.Width && r.Height == region.Height)
+                BitBlt(region.Dc, 0, 0, r.Width, r.Height, screen, r.X, r.Y, SRCCOPY);
             else
-                StretchBlt(region.Dc, 0, 0, region.Width, region.Height, screen, x, y, w, h, SRCCOPY);
+                StretchBlt(region.Dc, 0, 0, region.Width, region.Height, screen, r.X, r.Y, r.Width, r.Height, SRCCOPY);
             Gray.FromBgra(region.Bits, region.Width, region.Height, region.Image);
             return region.Image;
         }
