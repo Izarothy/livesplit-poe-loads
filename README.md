@@ -47,6 +47,7 @@ The component counts from the moment the timer starts and keeps the last run's n
 - **Measure ICT from the screen**: turn off to use only the log (load screens).
 - **Show "on NA"**: adds the "on NA naively" row.
 - **Save a snapshot of every missed click**: keeps the banner image of each missed click in `PoELoads\misses` for troubleshooting.
+- **Write diagnostics**: if ICT is never measured, turn this on and do a few zone changes. Every 10 s it writes what the component sees (game window, monitors and DPI, capture area, anything covering the banner, banner score) to `PoELoads\diagnostics\<run>\report.txt`, with the captured frame and banner band as PNGs. The frames show your game screen, so look through them before sharing.
 
 ## Build
 
