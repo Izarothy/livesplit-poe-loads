@@ -157,6 +157,11 @@ namespace LiveSplit.PoELoads
             TimeBeginPeriod(1);
             try
             {
+                // With display scaling, a DPI-unaware LiveSplit would get scaled-down window coordinates
+                // while the screen copy is in real pixels. Work in real pixels on this thread.
+                try { SetThreadDpiAwarenessContext(PerMonitorAwareV2); }
+                catch (EntryPointNotFoundException) { } // before Windows 10 1607
+
                 using (var capture = new Capture())
                 {
                     var window = IntPtr.Zero;
@@ -260,6 +265,9 @@ namespace LiveSplit.PoELoads
             thread?.Join(500);
         }
 
+        static readonly IntPtr PerMonitorAwareV2 = new IntPtr(-4);
+
+        [DllImport("user32.dll")] static extern IntPtr SetThreadDpiAwarenessContext(IntPtr context);
         [DllImport("winmm.dll", EntryPoint = "timeBeginPeriod")] static extern uint TimeBeginPeriod(uint ms);
         [DllImport("winmm.dll", EntryPoint = "timeEndPeriod")] static extern uint TimeEndPeriod(uint ms);
     }
