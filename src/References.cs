@@ -23,6 +23,13 @@ namespace LiveSplit.PoELoads
                 IctNew = 0.51, IctExisting = 0.15, IctLogout = 0.42,
                 ScreenNew = 0.56, ScreenExisting = 0.60, ScreenLogout = 0.64,
             },
+            new Reference
+            {
+                Name = "NA Texas", Label = "on Texas naively",
+                Source = "tytykiller, 102 transitions, ExileCon 2026 qualifier #4 (Texas realm)",
+                IctNew = 0.40, IctExisting = 0.08, IctLogout = 0.11,
+                ScreenNew = 0.90, ScreenExisting = 0.96, ScreenLogout = 1.18,
+            },
         };
 
         /// <summary>The reference with this name, or the first one for an unknown or empty name.</summary>
