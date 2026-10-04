@@ -25,7 +25,7 @@ namespace LiveSplit.PoELoads
         public string UpdateName => ComponentName;
         public string XMLURL => "";
         public string UpdateURL => "";
-        public Version Version => new Version(1, 4, 2);
+        public Version Version => new Version(1, 4, 3);
     }
 
     /// <summary>One finished transition of the current run.</summary>
@@ -121,6 +121,11 @@ namespace LiveSplit.PoELoads
                         current = new Load { IsLogin = loginInProgress };
                         loginInProgress = false;
                         watcher.ContactArmed = false;
+                        break;
+
+                    case LogEventKind.LoadFinished when current != null && state.CurrentPhase == TimerPhase.Paused:
+                        // the run is paused: this load is not part of it
+                        current = null;
                         break;
 
                     case LogEventKind.LoadFinished when current != null:
