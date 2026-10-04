@@ -176,11 +176,12 @@ namespace LiveSplit.PoELoads
 
             if (settings.ShowOnNa)
             {
-                // this run's loads at NA speed: ICT where measured, and every loading screen
-                var saved = loads.Where(l => l.Ict.HasValue).Sum(l => l.Ict.Value - NaIct(l))
-                          + loads.Sum(l => l.LoadScreen - NaScreen(l));
+                // this run's loads at the reference's speed: ICT where measured, and every loading screen
+                var reference = Reference.Find(settings.Reference);
+                var saved = loads.Where(l => l.Ict.HasValue).Sum(l => l.Ict.Value - RefIct(reference, l))
+                          + loads.Sum(l => l.LoadScreen - RefScreen(reference, l));
                 var now = (state.CurrentTime[state.CurrentTimingMethod] ?? TimeSpan.Zero).TotalSeconds;
-                yield return ("on NA naively", Clock(Math.Max(0, now - saved)), "", null);
+                yield return (reference.Label, Clock(Math.Max(0, now - saved)), "", null);
             }
             yield return ("Load time", none ? "-" : Clock(actual), "", null);
             yield return ("vs usual", none ? "-" : Signed(delta), none ? "" : Clock(par), none ? null : deltaColor);
@@ -190,17 +191,13 @@ namespace LiveSplit.PoELoads
             yield return ("Load screens", none ? "-" : Clock(screens.Sum()), none ? "" : "avg " + Fixed(screens.Average()), null);
         }
 
-        // what an NA-realm runner gets for the same kind of load: averages over imexile's
-        // 118 transitions in an Exilecon 2026 qualifier race (US realm)
-        const double NaIctNew = 0.51, NaIctExisting = 0.15, NaIctLogout = 0.42;
-        const double NaScreenNew = 0.56, NaScreenExisting = 0.60, NaScreenLogout = 0.64;
         const double ExistingInstanceIct = 0.55; // below this a zone change reused an existing instance
 
-        static double NaIct(Load load) =>
-            load.IsLogin ? NaIctLogout : load.Ict < ExistingInstanceIct ? NaIctExisting : NaIctNew;
+        static double RefIct(Reference r, Load load) =>
+            load.IsLogin ? r.IctLogout : load.Ict < ExistingInstanceIct ? r.IctExisting : r.IctNew;
 
-        static double NaScreen(Load load) =>
-            load.IsLogin ? NaScreenLogout : load.Ict < ExistingInstanceIct ? NaScreenExisting : NaScreenNew;
+        static double RefScreen(Reference r, Load load) =>
+            load.IsLogin ? r.ScreenLogout : load.Ict < ExistingInstanceIct ? r.ScreenExisting : r.ScreenNew;
 
         static string Signed(double seconds) =>
             (seconds >= 0 ? "+" : "-") + Math.Abs(seconds).ToString("0.0", CultureInfo.InvariantCulture);
@@ -297,7 +294,7 @@ namespace LiveSplit.PoELoads
             foreach (var row in Rows())
             {
                 var box = new RectangleF(SidePadding, y, width - 2 * SidePadding, RowHeight);
-                if (row.Label == "on NA naively")
+                if (row.Label == Reference.Find(settings.Reference).Label)
                 {
                     // a second timer: full width, set off from the load stats by a separator
                     DrawRow(g, state, box, row, 0);

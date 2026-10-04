@@ -22,7 +22,8 @@ namespace LiveSplit.PoELoads
         public string LogPath = "";           // empty: find it automatically
         public bool CaptureScreen = true;
         public bool SaveMissSnapshots = false; // debugging aid: keep the banner frame of each missed click
-        public bool ShowOnNa = false;          // extra row: the timer as it would read with NA-realm instance creation
+        public bool ShowOnNa = false;          // extra row: the timer as it would read with a reference setup's loads
+        public string Reference = "NA";        // which reference that row uses (References.cs)
         public bool WriteDiagnostics = false;  // troubleshooting: report what the screen watcher sees (PoELoads\diagnostics)
 
         /// <summary>The configured Client.txt, or the running game's, or a default install location.</summary>
@@ -48,11 +49,12 @@ namespace LiveSplit.PoELoads
         public XmlNode ToXml(XmlDocument document)
         {
             var root = document.CreateElement("Settings");
-            Add(document, root, "Version", "1.3");
+            Add(document, root, "Version", "1.5");
             Add(document, root, "LogPath", LogPath);
             Add(document, root, "CaptureScreen", CaptureScreen.ToString());
             Add(document, root, "SaveMissSnapshots", SaveMissSnapshots.ToString());
             Add(document, root, "ShowOnNa", ShowOnNa.ToString());
+            Add(document, root, "Reference", Reference);
             Add(document, root, "WriteDiagnostics", WriteDiagnostics.ToString());
             return root;
         }
@@ -66,6 +68,7 @@ namespace LiveSplit.PoELoads
                 SaveMissSnapshots = snapshots;
             if (bool.TryParse(node["ShowOnNa"]?.InnerText, out var onNa))
                 ShowOnNa = onNa;
+            Reference = node["Reference"]?.InnerText ?? "NA";
             if (bool.TryParse(node["WriteDiagnostics"]?.InnerText, out var diagnostics))
                 WriteDiagnostics = diagnostics;
         }
@@ -108,15 +111,27 @@ namespace LiveSplit.PoELoads
             layout.Controls.Add(new Label { Text = "(empty = find automatically)", AutoSize = true, ForeColor = SystemColors.GrayText }, 1, 1);
             layout.Controls.Add(capture, 1, 2);
             layout.Controls.Add(snapshots, 1, 3);
-            var onNaBox = new CheckBox { Text = "Show \"on NA\": the timer with NA-speed instance creation and loading screens", Checked = settings.ShowOnNa, AutoSize = true };
+            var onNaBox = new CheckBox { Text = "Show the timer with the loads of:", Checked = settings.ShowOnNa, AutoSize = true, Anchor = AnchorStyles.Left };
             onNaBox.CheckedChanged += (s, e) => settings.ShowOnNa = onNaBox.Checked;
-            layout.Controls.Add(onNaBox, 1, 4);
+            var reference = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 140 };
+            reference.Items.AddRange(Reference.All.Select(r => (object)r.Name).ToArray());
+            reference.SelectedItem = Reference.Find(settings.Reference).Name;
+            reference.SelectedIndexChanged += (s, e) => settings.Reference = (string)reference.SelectedItem;
+            var source = new Label { AutoSize = true, ForeColor = SystemColors.GrayText, Anchor = AnchorStyles.Left };
+            void ShowSource() => source.Text = Reference.Find(settings.Reference).Source;
+            reference.SelectedIndexChanged += (s, e) => ShowSource();
+            ShowSource();
+            var onNaRow = new FlowLayoutPanel { AutoSize = true, WrapContents = false, Margin = Padding.Empty };
+            onNaRow.Controls.Add(onNaBox);
+            onNaRow.Controls.Add(reference);
+            layout.Controls.Add(onNaRow, 1, 4);
+            layout.Controls.Add(source, 1, 5);
             var diagnosticsBox = new CheckBox { Text = "Write diagnostics while the timer runs (PoELoads\\diagnostics)", Checked = settings.WriteDiagnostics, AutoSize = true };
             diagnosticsBox.CheckedChanged += (s, e) => settings.WriteDiagnostics = diagnosticsBox.Checked;
-            layout.Controls.Add(diagnosticsBox, 1, 5);
+            layout.Controls.Add(diagnosticsBox, 1, 6);
 
             Controls.Add(layout);
-            Size = new Size(460, 180);
+            Size = new Size(460, 210);
         }
     }
 }
