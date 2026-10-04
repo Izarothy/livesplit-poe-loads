@@ -8,7 +8,7 @@
     <UseWindowsForms>true</UseWindowsForms>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <GenerateAssemblyInfo>true</GenerateAssemblyInfo>
-    <Version>1.4.3</Version>
+    <Version>1.5.0</Version>
     <Authors>Izarothy</Authors>
     <!-- folder containing LiveSplit.exe: a LiveSplit folder next to this repo, or -p:LiveSplitDir=... -->
     <LiveSplitDir Condition="'$(LiveSplitDir)' == ''">$(MSBuildThisFileDirectory)..\..\LiveSplit</LiveSplitDir>

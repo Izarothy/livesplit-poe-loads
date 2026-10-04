@@ -30,6 +30,13 @@ namespace LiveSplit.PoELoads
                 IctNew = 0.40, IctExisting = 0.08, IctLogout = 0.11,
                 ScreenNew = 0.90, ScreenExisting = 0.96, ScreenLogout = 1.18,
             },
+            new Reference
+            {
+                Name = "NZ LAN", Label = "on NZ LAN naively",
+                Source = "imexile, 83 transitions, ExileCon 2023 LAN race (official stream)",
+                IctNew = 0.11, IctExisting = 0.04, IctLogout = 0.03,
+                ScreenNew = 0.74, ScreenExisting = 0.46, ScreenLogout = 0.82,
+            },
         };
 
         /// <summary>The reference with this name, or the first one for an unknown or empty name.</summary>

@@ -25,7 +25,7 @@ namespace LiveSplit.PoELoads
         public string UpdateName => ComponentName;
         public string XMLURL => "";
         public string UpdateURL => "";
-        public Version Version => new Version(1, 4, 3);
+        public Version Version => new Version(1, 5, 0);
     }
 
     /// <summary>One finished transition of the current run.</summary>

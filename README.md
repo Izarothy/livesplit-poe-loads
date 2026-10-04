@@ -9,7 +9,7 @@ A LiveSplit component that shows how much of your Path of Exile run goes to zone
 
 | Row | Meaning |
 |---|---|
-| **on NA naively** | *(optional)* The run timer as it would read with NA-speed ICT and load screens for the same loads (averages from a US-realm race). Naive because it assumes nothing else changes. |
+| **on NA naively** | *(optional)* The run timer as it would read with another setup's ICT and load screens for the same loads. Pick the setup in the settings: NA (US realm), NA Texas or NZ LAN, each averaged from a measured race. The label follows the choice ("on Texas naively", ...). Naive because it assumes nothing else changes. |
 | **Load time** | ICT + load screens so far this run |
 | **vs usual** | Difference from your usual pace for the same loads (red = slower, green = faster). The muted number is the usual time. |
 | **ICT** | Total, average, and `N?` if N clicks could not be measured |
@@ -45,7 +45,12 @@ The component counts from the moment the timer starts and keeps the last run's n
 
 - **Client.txt**: empty finds it automatically (running game, then the standalone, Steam and Epic default locations).
 - **Measure ICT from the screen**: turn off to use only the log (load screens).
-- **Show "on NA"**: adds the "on NA naively" row.
+- **Show the timer with the loads of**: adds the "on ... naively" row for the chosen reference:
+  - **NA**: imexile, ExileCon 2026 qualifier (US realm).
+  - **NA Texas**: tytykiller, ExileCon 2026 qualifier #4 (Texas realm).
+  - **NZ LAN**: imexile, ExileCon 2023 LAN race.
+
+  Load screens reflect that runner's PC as well as the server.
 - **Save a snapshot of every missed click**: keeps the banner image of each missed click in `PoELoads\misses` for troubleshooting.
 - **Write diagnostics**: if ICT is never measured, turn this on and do a few zone changes. Every 10 s it writes what the component sees (game window, monitors and DPI, capture area, anything covering the banner, banner score) to `PoELoads\diagnostics\<run>\report.txt`, with the captured frame and banner band as PNGs. The frames show your game screen, so look through them before sharing.
 
