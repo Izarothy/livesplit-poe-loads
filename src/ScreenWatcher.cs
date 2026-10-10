@@ -150,7 +150,7 @@ namespace LiveSplit.PoELoads
                 return banners.Select(e => new Episode { Onset = e.Onset, LastSeen = e.LastSeen }).ToArray();
         }
 
-        static long Now() => (uint)Environment.TickCount; // same clock as Client.txt ticks
+        internal static long Now() => (uint)Environment.TickCount; // same clock as Client.txt ticks
 
         void Run()
         {

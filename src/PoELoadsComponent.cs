@@ -25,7 +25,7 @@ namespace LiveSplit.PoELoads
         public string UpdateName => ComponentName;
         public string XMLURL => "";
         public string UpdateURL => "";
-        public Version Version => new Version(1, 5, 0);
+        public Version Version => new Version(1, 6, 0);
     }
 
     /// <summary>One finished transition of the current run.</summary>
@@ -35,6 +35,7 @@ namespace LiveSplit.PoELoads
         public bool IsLogin;
         public double? Ict;         // click ("Entering" / "Contacting server" onset) -> loading screen
         public double LoadScreen;   // loading screen on screen
+        public double RunSeconds;   // run timer when the loading screen ended
         public float BannerBest;    // diagnostics: best banner score in the 3 s before the loading screen
         public int BannerFrames;    // diagnostics: frames watched in those 3 s (0 = game covered or minimised)
     }
@@ -143,6 +144,7 @@ namespace LiveSplit.PoELoads
                         current.BannerFrames = frames;
                         current.Area = e.Area;
                         current.LoadScreen = e.Seconds;
+                        current.RunSeconds = RunNow - Math.Max(0, ScreenWatcher.Now() - e.Tick) / 1000.0;
                         loads.Add(current);
                         Append(current);
                         current = null;
@@ -176,12 +178,10 @@ namespace LiveSplit.PoELoads
 
             if (settings.ShowOnNa)
             {
-                // this run's loads at the reference's speed: ICT where measured, and every loading screen
                 var reference = Reference.Find(settings.Reference);
-                var saved = loads.Where(l => l.Ict.HasValue).Sum(l => l.Ict.Value - RefIct(reference, l))
-                          + loads.Sum(l => l.LoadScreen - RefScreen(reference, l));
-                var now = (state.CurrentTime[state.CurrentTimingMethod] ?? TimeSpan.Zero).TotalSeconds;
-                yield return (reference.Label, Clock(Math.Max(0, now - saved)), "", null);
+                yield return (reference.Label, Clock(Math.Max(0, RunNow - Saved(reference, loads))), "", null);
+                if (settings.ShowSplitOnNa)
+                    yield return LastSplitRow(reference);
             }
             yield return ("Load time", none ? "-" : Clock(actual), "", null);
             yield return ("vs usual", none ? "-" : Signed(delta), none ? "" : Clock(par), none ? null : deltaColor);
@@ -189,6 +189,41 @@ namespace LiveSplit.PoELoads
             yield return (missed > 0 ? $"ICT  ({missed}?)" : "ICT", icts.Count == 0 ? "-" : Clock(icts.Sum()),
                           icts.Count == 0 ? "" : "avg " + Fixed(icts.Average()), null);
             yield return ("Load screens", none ? "-" : Clock(screens.Sum()), none ? "" : "avg " + Fixed(screens.Average()), null);
+        }
+
+        double RunNow => (state.CurrentTime[state.CurrentTimingMethod] ?? TimeSpan.Zero).TotalSeconds;
+
+        /// <summary>
+        /// How much faster these loads would have been on the reference: ICT where measured, and every
+        /// loading screen.
+        /// </summary>
+        static double Saved(Reference reference, IEnumerable<Load> done) =>
+            done.Where(l => l.Ict.HasValue).Sum(l => l.Ict.Value - RefIct(reference, l))
+            + done.Sum(l => l.LoadScreen - RefScreen(reference, l));
+
+        // a split on entering a zone can come before that zone's loading screen has ended
+        const double SplitGrace = 3.0;
+        const int SplitNameLength = 18;
+
+        /// <summary>The latest split's time on the reference's loads; the muted number is its segment.</summary>
+        (string Label, string Value, string Detail, Color? ValueColor) LastSplitRow(Reference reference)
+        {
+            var method = state.CurrentTimingMethod;
+            var splits = Enumerable.Range(0, Math.Max(0, Math.Min(state.CurrentSplitIndex, state.Run.Count)))
+                .Select(i => (state.Run[i].Name, Time: state.Run[i].SplitTime[method]))
+                .Where(s => s.Time.HasValue) // skipped splits have no time
+                .Select(s => (s.Name, Seconds: s.Time.Value.TotalSeconds))
+                .ToList();
+            if (splits.Count == 0)
+                return ("Last split " + reference.ShortLabel, "-", "", null);
+
+            double OnReference(double split) =>
+                Math.Max(0, split - Saved(reference, loads.Where(l => l.RunSeconds <= split + SplitGrace)));
+            var last = splits[splits.Count - 1];
+            var at = OnReference(last.Seconds);
+            var previous = splits.Count > 1 ? OnReference(splits[splits.Count - 2].Seconds) : 0;
+            var name = last.Name.Length > SplitNameLength ? last.Name.Substring(0, SplitNameLength - 1) + "…" : last.Name;
+            return (name + " " + reference.ShortLabel, Clock(at), Clock(at - previous), null);
         }
 
         const double ExistingInstanceIct = 0.55; // below this a zone change reused an existing instance
@@ -224,7 +259,7 @@ namespace LiveSplit.PoELoads
             {
                 Directory.CreateDirectory(RunFolder);
                 var file = Path.Combine(RunFolder, DateTime.Now.ToString("yyyy-MM-dd HH-mm-ss", CultureInfo.InvariantCulture) + ".csv");
-                File.WriteAllText(file, "n,kind,area,ict_s,loadscreen_s,banner_best,banner_frames,ict_to\r\n");
+                File.WriteAllText(file, "n,kind,area,ict_s,loadscreen_s,banner_best,banner_frames,ict_to,run_s\r\n");
                 return file;
             }
             catch (IOException) { return null; }
@@ -256,7 +291,7 @@ namespace LiveSplit.PoELoads
             var line = string.Join(",", loads.Count, load.IsLogin ? "login" : "zone", "\"" + load.Area.Replace("\"", "\"\"") + "\"",
                                    ict, load.LoadScreen.ToString("0.000", CultureInfo.InvariantCulture),
                                    float.IsNaN(load.BannerBest) ? "" : load.BannerBest.ToString("0.00", CultureInfo.InvariantCulture),
-                                   load.BannerFrames, "loadscreen");
+                                   load.BannerFrames, "loadscreen", load.RunSeconds.ToString("0.000", CultureInfo.InvariantCulture));
             try { File.AppendAllText(runFile, line + "\r\n"); }
             catch (IOException) { }
         }
@@ -264,7 +299,9 @@ namespace LiveSplit.PoELoads
         // ------------------------------------------------------------------ IComponent
 
         public string ComponentName => "PoE Loads";
-        int RowCount => settings.ShowOnNa ? 5 : 4;
+        // the timer rows on the reference's loads, above the load stats
+        int ReferenceRows => settings.ShowOnNa ? (settings.ShowSplitOnNa ? 2 : 1) : 0;
+        int RowCount => 4 + ReferenceRows;
         public float VerticalHeight => RowHeight * RowCount;
         public float MinimumWidth => 120;
         public float HorizontalWidth => 190 * RowCount;
@@ -291,21 +328,17 @@ namespace LiveSplit.PoELoads
             var layout = state.LayoutSettings;
             var detailColumn = DetailColumnWidth(g, layout.TimesFont);
             var y = 0f;
+            var index = 0;
             foreach (var row in Rows())
             {
                 var box = new RectangleF(SidePadding, y, width - 2 * SidePadding, RowHeight);
-                if (row.Label == Reference.Find(settings.Reference).Label)
-                {
-                    // a second timer: full width, set off from the load stats by a separator
-                    DrawRow(g, state, box, row, 0);
-                    using (var pen = new Pen(layout.SeparatorsColor, 1))
+                // the reference timer is a second timer: full width
+                DrawRow(g, state, box, row, ReferenceRows > 0 && index == 0 ? 0 : detailColumn);
+                if (index == ReferenceRows - 1)
+                    using (var pen = new Pen(layout.SeparatorsColor, 1)) // sets the reference rows off from the load stats
                         g.DrawLine(pen, 0, y + RowHeight - 1, width, y + RowHeight - 1);
-                }
-                else
-                {
-                    DrawRow(g, state, box, row, detailColumn);
-                }
                 y += RowHeight;
+                index++;
             }
         }
 
