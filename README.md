@@ -10,7 +10,6 @@ A LiveSplit component that shows how much of your Path of Exile run goes to zone
 | Row | Meaning |
 |---|---|
 | **on NA naively** | *(optional)* The run timer as it would read with another setup's ICT and load screens for the same loads. Pick the setup in the settings: NA (US realm), NA Texas or NZ LAN, each averaged from a measured race. The label follows the choice ("on Texas naively", ...). Naive because it assumes nothing else changes. |
-| **&lt;split&gt; on NA** | *(optional, with the row above)* Your latest split's time with the same setup's loads, e.g. "City of Sarn on NA". The muted number is that split's segment. The loading screen into the split's zone counts towards it, even if it ends just after the split. |
 | **Load time** | ICT + load screens so far this run |
 | **vs usual** | Difference from your usual pace for the same loads (red = slower, green = faster). The muted number is the usual time. |
 | **ICT** | Total, average, and `N?` if N clicks could not be measured |
@@ -52,7 +51,7 @@ The component counts from the moment the timer starts and keeps the last run's n
   - **NZ LAN**: imexile, ExileCon 2023 LAN race.
 
   Load screens reflect that runner's PC as well as the server.
-- **...and the last split with those loads**: adds the "&lt;split&gt; on NA" row under it. It reads LiveSplit's splits and leaves Game Time alone, so it works alongside an autosplitter's load removal.
+- **Write that timer to Game Time**: makes LiveSplit's Game Time the run timer with the chosen reference's loads, so every split gets its time on NA. Show it with a Splits column (Edit Layout → Splits → Columns → add one, Timing Method: Game Time); LiveSplit then keeps personal bests and best segments for it too. Real Time is unchanged. Game Time has one owner: turn off the autosplitter's load removal before using this. The loading screen into a split's zone counts towards that split, even if it ends just after the split.
 - **Save a snapshot of every missed click**: keeps the banner image of each missed click in `PoELoads\misses` for troubleshooting.
 - **Write diagnostics**: if ICT is never measured, turn this on and do a few zone changes. Every 10 s it writes what the component sees (game window, monitors and DPI, capture area, anything covering the banner, banner score) to `PoELoads\diagnostics\<run>\report.txt`, with the captured frame and banner band as PNGs. The frames show your game screen, so look through them before sharing.
 

@@ -25,7 +25,7 @@ namespace LiveSplit.PoELoads
         public string UpdateName => ComponentName;
         public string XMLURL => "";
         public string UpdateURL => "";
-        public Version Version => new Version(1, 6, 0);
+        public Version Version => new Version(1, 7, 0);
     }
 
     /// <summary>One finished transition of the current run.</summary>
@@ -147,11 +147,42 @@ namespace LiveSplit.PoELoads
                         current.RunSeconds = RunNow - Math.Max(0, ScreenWatcher.Now() - e.Tick) / 1000.0;
                         loads.Add(current);
                         Append(current);
+                        if (settings.ReferenceGameTime)
+                            RetimeSplitBefore(current);
                         current = null;
                         break;
                     }
                 }
             }
+
+            if (settings.ReferenceGameTime)
+            {
+                // Game Time = real time minus what the reference would have saved on this run's loads
+                state.IsGameTimeInitialized = true;
+                state.LoadingTimes = TimeSpan.FromSeconds(Saved(Reference.Find(settings.Reference), loads));
+            }
+        }
+
+        // a split on entering a zone can come before that zone's loading screen has ended
+        const double SplitGrace = 3.0;
+
+        /// <summary>
+        /// A split recorded just before this load ended took its Game Time without it: give that split
+        /// its Game Time again with the load counted.
+        /// </summary>
+        void RetimeSplitBefore(Load load)
+        {
+            var index = Math.Min(state.CurrentSplitIndex, state.Run.Count) - 1;
+            if (index < 0)
+                return;
+            var split = state.Run[index].SplitTime;
+            if (!split.RealTime.HasValue)
+                return;
+            var real = split.RealTime.Value.TotalSeconds;
+            if (load.RunSeconds <= real || load.RunSeconds > real + SplitGrace)
+                return;
+            var saved = Saved(Reference.Find(settings.Reference), loads.Where(l => l.RunSeconds <= real + SplitGrace));
+            state.Run[index].SplitTime = new Time(split.RealTime, TimeSpan.FromSeconds(Math.Max(0, real - saved)));
         }
 
         // ------------------------------------------------------------------ numbers
@@ -180,8 +211,6 @@ namespace LiveSplit.PoELoads
             {
                 var reference = Reference.Find(settings.Reference);
                 yield return (reference.Label, Clock(Math.Max(0, RunNow - Saved(reference, loads))), "", null);
-                if (settings.ShowSplitOnNa)
-                    yield return LastSplitRow(reference);
             }
             yield return ("Load time", none ? "-" : Clock(actual), "", null);
             yield return ("vs usual", none ? "-" : Signed(delta), none ? "" : Clock(par), none ? null : deltaColor);
@@ -191,7 +220,8 @@ namespace LiveSplit.PoELoads
             yield return ("Load screens", none ? "-" : Clock(screens.Sum()), none ? "" : "avg " + Fixed(screens.Average()), null);
         }
 
-        double RunNow => (state.CurrentTime[state.CurrentTimingMethod] ?? TimeSpan.Zero).TotalSeconds;
+        // real time: Game Time may be this component's own reference timer
+        double RunNow => (state.CurrentTime.RealTime ?? TimeSpan.Zero).TotalSeconds;
 
         /// <summary>
         /// How much faster these loads would have been on the reference: ICT where measured, and every
@@ -200,31 +230,6 @@ namespace LiveSplit.PoELoads
         static double Saved(Reference reference, IEnumerable<Load> done) =>
             done.Where(l => l.Ict.HasValue).Sum(l => l.Ict.Value - RefIct(reference, l))
             + done.Sum(l => l.LoadScreen - RefScreen(reference, l));
-
-        // a split on entering a zone can come before that zone's loading screen has ended
-        const double SplitGrace = 3.0;
-        const int SplitNameLength = 18;
-
-        /// <summary>The latest split's time on the reference's loads; the muted number is its segment.</summary>
-        (string Label, string Value, string Detail, Color? ValueColor) LastSplitRow(Reference reference)
-        {
-            var method = state.CurrentTimingMethod;
-            var splits = Enumerable.Range(0, Math.Max(0, Math.Min(state.CurrentSplitIndex, state.Run.Count)))
-                .Select(i => (state.Run[i].Name, Time: state.Run[i].SplitTime[method]))
-                .Where(s => s.Time.HasValue) // skipped splits have no time
-                .Select(s => (s.Name, Seconds: s.Time.Value.TotalSeconds))
-                .ToList();
-            if (splits.Count == 0)
-                return ("Last split " + reference.ShortLabel, "-", "", null);
-
-            double OnReference(double split) =>
-                Math.Max(0, split - Saved(reference, loads.Where(l => l.RunSeconds <= split + SplitGrace)));
-            var last = splits[splits.Count - 1];
-            var at = OnReference(last.Seconds);
-            var previous = splits.Count > 1 ? OnReference(splits[splits.Count - 2].Seconds) : 0;
-            var name = last.Name.Length > SplitNameLength ? last.Name.Substring(0, SplitNameLength - 1) + "…" : last.Name;
-            return (name + " " + reference.ShortLabel, Clock(at), Clock(at - previous), null);
-        }
 
         const double ExistingInstanceIct = 0.55; // below this a zone change reused an existing instance
 
@@ -299,9 +304,7 @@ namespace LiveSplit.PoELoads
         // ------------------------------------------------------------------ IComponent
 
         public string ComponentName => "PoE Loads";
-        // the timer rows on the reference's loads, above the load stats
-        int ReferenceRows => settings.ShowOnNa ? (settings.ShowSplitOnNa ? 2 : 1) : 0;
-        int RowCount => 4 + ReferenceRows;
+        int RowCount => settings.ShowOnNa ? 5 : 4;
         public float VerticalHeight => RowHeight * RowCount;
         public float MinimumWidth => 120;
         public float HorizontalWidth => 190 * RowCount;
@@ -328,17 +331,21 @@ namespace LiveSplit.PoELoads
             var layout = state.LayoutSettings;
             var detailColumn = DetailColumnWidth(g, layout.TimesFont);
             var y = 0f;
-            var index = 0;
             foreach (var row in Rows())
             {
                 var box = new RectangleF(SidePadding, y, width - 2 * SidePadding, RowHeight);
-                // the reference timer is a second timer: full width
-                DrawRow(g, state, box, row, ReferenceRows > 0 && index == 0 ? 0 : detailColumn);
-                if (index == ReferenceRows - 1)
-                    using (var pen = new Pen(layout.SeparatorsColor, 1)) // sets the reference rows off from the load stats
+                if (row.Label == Reference.Find(settings.Reference).Label)
+                {
+                    // a second timer: full width, set off from the load stats by a separator
+                    DrawRow(g, state, box, row, 0);
+                    using (var pen = new Pen(layout.SeparatorsColor, 1))
                         g.DrawLine(pen, 0, y + RowHeight - 1, width, y + RowHeight - 1);
+                }
+                else
+                {
+                    DrawRow(g, state, box, row, detailColumn);
+                }
                 y += RowHeight;
-                index++;
             }
         }
 

@@ -14,9 +14,6 @@ namespace LiveSplit.PoELoads
         public double IctNew, IctExisting, IctLogout;
         public double ScreenNew, ScreenExisting, ScreenLogout;
 
-        /// <summary>"on NA" for "on NA naively": the suffix of the last-split row.</summary>
-        public string ShortLabel => Label.Replace(" naively", "");
-
         public static readonly Reference[] All =
         {
             new Reference

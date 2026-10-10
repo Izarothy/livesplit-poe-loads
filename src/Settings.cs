@@ -24,7 +24,7 @@ namespace LiveSplit.PoELoads
         public bool SaveMissSnapshots = false; // debugging aid: keep the banner frame of each missed click
         public bool ShowOnNa = false;          // extra row: the timer as it would read with a reference setup's loads
         public string Reference = "NA";        // which reference that row uses (References.cs)
-        public bool ShowSplitOnNa = false;     // one more row: the last split's time with the reference's loads
+        public bool ReferenceGameTime = false; // drive LiveSplit's Game Time with that reference's timer
         public bool WriteDiagnostics = false;  // troubleshooting: report what the screen watcher sees (PoELoads\diagnostics)
 
         /// <summary>The configured Client.txt, or the running game's, or a default install location.</summary>
@@ -50,13 +50,13 @@ namespace LiveSplit.PoELoads
         public XmlNode ToXml(XmlDocument document)
         {
             var root = document.CreateElement("Settings");
-            Add(document, root, "Version", "1.6");
+            Add(document, root, "Version", "1.7");
             Add(document, root, "LogPath", LogPath);
             Add(document, root, "CaptureScreen", CaptureScreen.ToString());
             Add(document, root, "SaveMissSnapshots", SaveMissSnapshots.ToString());
             Add(document, root, "ShowOnNa", ShowOnNa.ToString());
             Add(document, root, "Reference", Reference);
-            Add(document, root, "ShowSplitOnNa", ShowSplitOnNa.ToString());
+            Add(document, root, "ReferenceGameTime", ReferenceGameTime.ToString());
             Add(document, root, "WriteDiagnostics", WriteDiagnostics.ToString());
             return root;
         }
@@ -71,8 +71,8 @@ namespace LiveSplit.PoELoads
             if (bool.TryParse(node["ShowOnNa"]?.InnerText, out var onNa))
                 ShowOnNa = onNa;
             Reference = node["Reference"]?.InnerText ?? "NA";
-            if (bool.TryParse(node["ShowSplitOnNa"]?.InnerText, out var splitOnNa))
-                ShowSplitOnNa = splitOnNa;
+            if (bool.TryParse(node["ReferenceGameTime"]?.InnerText, out var gameTime))
+                ReferenceGameTime = gameTime;
             if (bool.TryParse(node["WriteDiagnostics"]?.InnerText, out var diagnostics))
                 WriteDiagnostics = diagnostics;
         }
@@ -130,9 +130,9 @@ namespace LiveSplit.PoELoads
             onNaRow.Controls.Add(reference);
             layout.Controls.Add(onNaRow, 1, 4);
             layout.Controls.Add(source, 1, 5);
-            var splitOnNaBox = new CheckBox { Text = "...and the last split with those loads", Checked = settings.ShowSplitOnNa, AutoSize = true, Margin = new Padding(20, 3, 3, 3) };
-            splitOnNaBox.CheckedChanged += (s, e) => settings.ShowSplitOnNa = splitOnNaBox.Checked;
-            layout.Controls.Add(splitOnNaBox, 1, 6);
+            var gameTimeBox = new CheckBox { Text = "Write that timer to Game Time (not together with load removal)", Checked = settings.ReferenceGameTime, AutoSize = true };
+            gameTimeBox.CheckedChanged += (s, e) => settings.ReferenceGameTime = gameTimeBox.Checked;
+            layout.Controls.Add(gameTimeBox, 1, 6);
             var diagnosticsBox = new CheckBox { Text = "Write diagnostics while the timer runs (PoELoads\\diagnostics)", Checked = settings.WriteDiagnostics, AutoSize = true };
             diagnosticsBox.CheckedChanged += (s, e) => settings.WriteDiagnostics = diagnosticsBox.Checked;
             layout.Controls.Add(diagnosticsBox, 1, 7);
