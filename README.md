@@ -28,6 +28,15 @@ Every load is also written to `PoELoads\<run start>.csv` next to `LiveSplit.exe`
 
 The component counts from the moment the timer starts and keeps the last run's numbers on screen after a reset until the next start.
 
+### Example splits and layout
+
+My Act 1–5 splits and layout are in [`examples`](examples).
+
+1. Install the component (above).
+2. Right-click LiveSplit → Open Splits → From File → the `.lss`.
+3. Right-click LiveSplit → Open Layout → From File → the `.lsl`.
+4. Right-click LiveSplit → Edit Splits → **Activate** (Path of Exile autosplitter). If the game isn't in the default folder, set its `Client.txt` under **Settings** there.
+
 ## How it works
 
 - **Load screens** come from `Client.txt`: each transition logs when the level is generated (the loading screen appears) and how long the loading screen lasted. The log's millisecond tick is the Windows uptime clock, the same clock LiveSplit's process sees, so no guessing is involved.
