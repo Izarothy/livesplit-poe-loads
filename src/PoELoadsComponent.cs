@@ -25,7 +25,7 @@ namespace LiveSplit.PoELoads
         public string UpdateName => ComponentName;
         public string XMLURL => "";
         public string UpdateURL => "";
-        public Version Version => new Version(1, 7, 0);
+        public Version Version => new Version(1, 8, 0);
     }
 
     /// <summary>One finished transition of the current run.</summary>
@@ -34,6 +34,8 @@ namespace LiveSplit.PoELoads
         public string Area;
         public bool IsLogin;
         public double? Ict;         // click ("Entering" / "Contacting server" onset) -> loading screen
+        public double? Logout;      // login only: disconnect or exit -> character list on screen
+        public long? LogoutTick;    // login only: when that logout started (Client.txt tick)
         public double LoadScreen;   // loading screen on screen
         public double RunSeconds;   // run timer when the loading screen ended
         public float BannerBest;    // diagnostics: best banner score in the 3 s before the loading screen
@@ -41,7 +43,7 @@ namespace LiveSplit.PoELoads
     }
 
     /// <summary>
-    /// Four rows for the current run: load time (ICT + loading screens), the difference from the
+    /// Four rows for the current run: load time (logouts + ICT + loading screens), the difference from the
     /// usual pace (averages of recent runs times this run's loads), ICT alone and loading screens alone. Loading screens come from Client.txt; ICT needs the
     /// on-screen cue that marks the click, so the screen is watched while the timer runs.
     /// Numbers stay on screen after a reset until the next start; every load is also written to
@@ -61,6 +63,7 @@ namespace LiveSplit.PoELoads
         ClientLog log;
         DateTime lastPoll = DateTime.MinValue;
         bool loginInProgress;
+        long? logoutTick;      // first logout line of the login in progress
         Load current;          // generated, loading screen not finished yet
         string runFile;
         Baseline usual;
@@ -80,6 +83,7 @@ namespace LiveSplit.PoELoads
             loads.Clear();
             current = null;
             loginInProgress = false;
+            logoutTick = null;
             watcher.Clear();
             log = new ClientLog(settings.ResolveLogPath()); // the game may have started since
             log.SkipToEnd();
@@ -108,6 +112,7 @@ namespace LiveSplit.PoELoads
                         // (its log line still follows): leave it out of the stats
                         current = null;
                         loginInProgress = true;
+                        logoutTick = logoutTick ?? e.Tick; // a disconnect is followed by the login-server connect
                         watcher.ContactArmed = true;
                         break;
 
@@ -115,12 +120,14 @@ namespace LiveSplit.PoELoads
                         // a new character entering The Twilight Strand starts a run; it is not a load of one
                         current = null;
                         loginInProgress = false;
+                        logoutTick = null;
                         watcher.ContactArmed = false;
                         break;
 
                     case LogEventKind.Generating:
-                        current = new Load { IsLogin = loginInProgress };
+                        current = new Load { IsLogin = loginInProgress, LogoutTick = loginInProgress ? logoutTick : null };
                         loginInProgress = false;
+                        logoutTick = null;
                         watcher.ContactArmed = false;
                         break;
 
@@ -140,6 +147,7 @@ namespace LiveSplit.PoELoads
                         if (settings.SaveMissSnapshots && !current.IsLogin && ict == null && frames > 0)
                             SaveMiss(loadStart);
                         current.Ict = ict >= 0 && ict < 60 ? ict : null;
+                        current.Logout = LogoutSeconds(current, loadStart);
                         current.BannerBest = best;
                         current.BannerFrames = frames;
                         current.Area = e.Area;
@@ -161,6 +169,17 @@ namespace LiveSplit.PoELoads
                 state.IsGameTimeInitialized = true;
                 state.LoadingTimes = TimeSpan.FromSeconds(Saved(Reference.Find(settings.Reference), loads));
             }
+        }
+
+        /// <summary>Logout to character list, for a login whose list was seen before its loading screen.</summary>
+        double? LogoutSeconds(Load load, long loadStart)
+        {
+            if (!load.IsLogin || load.LogoutTick == null)
+                return null;
+            var shown = watcher.CharSelectAfter(load.LogoutTick.Value);
+            if (shown == null || shown.Value > loadStart)
+                return null;
+            return (shown.Value - load.LogoutTick.Value) / 1000.0;
         }
 
         // a split on entering a zone can come before that zone's loading screen has ended
@@ -192,16 +211,20 @@ namespace LiveSplit.PoELoads
             var icts = loads.Where(l => l.Ict.HasValue).Select(l => l.Ict.Value).ToList();
             var screens = loads.Select(l => l.LoadScreen).ToList();
             var none = loads.Count == 0;
-            var measured = icts.Sum() + screens.Sum();
+            var logouts = loads.Where(l => l.Logout.HasValue).Select(l => l.Logout.Value).ToList();
+            var measured = logouts.Sum() + icts.Sum() + screens.Sum();
 
             // Load time: a missed click is filled with this run's average ICT for its kind.
             double RunIct(bool login) =>
                 loads.Where(l => l.IsLogin == login && l.Ict.HasValue).Select(l => l.Ict.Value)
                      .DefaultIfEmpty(login ? usual.LoginIct : usual.ZoneIct).Average();
-            var actual = measured + loads.Where(l => !l.Ict.HasValue).Sum(l => RunIct(l.IsLogin));
+            // a login whose character list was missed (game covered) gets this run's average logout
+            var runLogout = logouts.DefaultIfEmpty(usual.LoginLogout).Average();
+            var actual = measured + loads.Where(l => !l.Ict.HasValue).Sum(l => RunIct(l.IsLogin))
+                         + loads.Count(l => l.IsLogin && !l.Logout.HasValue) * runLogout;
 
             // vs usual: like for like, so a missed click moves neither side.
-            var par = loads.Sum(l => l.Ict.HasValue ? usual.Par(l) : usual.Screen(l));
+            var par = loads.Sum(l => (l.Ict.HasValue ? usual.Par(l) : usual.Screen(l)) + (l.Logout.HasValue ? usual.LoginLogout : 0));
             var delta = measured - par;
             var layout = state.LayoutSettings;
             Color? deltaColor = Math.Abs(delta) < 0.05 ? (Color?)null
@@ -225,7 +248,7 @@ namespace LiveSplit.PoELoads
 
         /// <summary>
         /// How much faster these loads would have been on the reference: ICT where measured, and every
-        /// loading screen.
+        /// loading screen. Logouts aren't compared: the references have no measurement of them.
         /// </summary>
         static double Saved(Reference reference, IEnumerable<Load> done) =>
             done.Where(l => l.Ict.HasValue).Sum(l => l.Ict.Value - RefIct(reference, l))
@@ -264,7 +287,7 @@ namespace LiveSplit.PoELoads
             {
                 Directory.CreateDirectory(RunFolder);
                 var file = Path.Combine(RunFolder, DateTime.Now.ToString("yyyy-MM-dd HH-mm-ss", CultureInfo.InvariantCulture) + ".csv");
-                File.WriteAllText(file, "n,kind,area,ict_s,loadscreen_s,banner_best,banner_frames,ict_to,run_s\r\n");
+                File.WriteAllText(file, "n,kind,area,ict_s,loadscreen_s,banner_best,banner_frames,ict_to,run_s,logout_s\r\n");
                 return file;
             }
             catch (IOException) { return null; }
@@ -296,7 +319,8 @@ namespace LiveSplit.PoELoads
             var line = string.Join(",", loads.Count, load.IsLogin ? "login" : "zone", "\"" + load.Area.Replace("\"", "\"\"") + "\"",
                                    ict, load.LoadScreen.ToString("0.000", CultureInfo.InvariantCulture),
                                    float.IsNaN(load.BannerBest) ? "" : load.BannerBest.ToString("0.00", CultureInfo.InvariantCulture),
-                                   load.BannerFrames, "loadscreen", load.RunSeconds.ToString("0.000", CultureInfo.InvariantCulture));
+                                   load.BannerFrames, "loadscreen", load.RunSeconds.ToString("0.000", CultureInfo.InvariantCulture),
+                                   load.Logout?.ToString("0.000", CultureInfo.InvariantCulture) ?? "");
             try { File.AppendAllText(runFile, line + "\r\n"); }
             catch (IOException) { }
         }

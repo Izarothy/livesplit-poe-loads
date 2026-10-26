@@ -20,6 +20,7 @@ namespace LiveSplit.PoELoads
 
         public double ZoneIct = 0.70, ZoneScreen = 1.20;
         public double LoginIct = 0.65, LoginScreen = 1.45;
+        public double LoginLogout = 0.5; // disconnect -> character list, from race footage
         public int Runs;
 
         public double Par(Load load) => load.IsLogin ? LoginIct + LoginScreen : ZoneIct + ZoneScreen;
@@ -52,18 +53,22 @@ namespace LiveSplit.PoELoads
 
             Apply("zone", ref baseline.ZoneIct, ref baseline.ZoneScreen);
             Apply("login", ref baseline.LoginIct, ref baseline.LoginScreen);
+            var logouts = rows.Where(r => r.Logout.HasValue).Select(r => r.Logout.Value).ToList();
+            if (logouts.Count > 0)
+                baseline.LoginLogout = logouts.Average();
             return baseline;
         }
 
-        static List<(string Kind, double? Ict, double Screen)> ReadRun(string file)
+        static List<(string Kind, double? Ict, double Screen, double? Logout)> ReadRun(string file)
         {
-            var rows = new List<(string, double?, double)>();
+            var rows = new List<(string, double?, double, double?)>();
             try
             {
                 var lines = File.ReadLines(file).ToList();
                 // files without the "ict_to" column (before 1.4) measured ICT up to "Generating level",
                 // on average this much after the loading screen really appears ("Got Instance Details")
                 var offset = lines.Count > 0 && lines[0].Contains("ict_to") ? 0 : 0.107;
+                var hasLogout = lines.Count > 0 && lines[0].TrimEnd().EndsWith(",logout_s"); // last column, since 1.8
                 foreach (var line in lines.Skip(1))
                 {
                     var match = Row.Match(line.Trim());
@@ -72,7 +77,9 @@ namespace LiveSplit.PoELoads
                     var ict = match.Groups[3].Value.Length > 0
                         ? Math.Max(0, double.Parse(match.Groups[3].Value, CultureInfo.InvariantCulture) - offset)
                         : (double?)null;
-                    rows.Add((match.Groups[1].Value, ict, double.Parse(match.Groups[4].Value, CultureInfo.InvariantCulture)));
+                    var last = match.Groups[5].Value.Split(',').Last();
+                    var logout = hasLogout && last.Length > 0 ? double.Parse(last, CultureInfo.InvariantCulture) : (double?)null;
+                    rows.Add((match.Groups[1].Value, ict, double.Parse(match.Groups[4].Value, CultureInfo.InvariantCulture), logout));
                 }
             }
             catch (IOException) { }

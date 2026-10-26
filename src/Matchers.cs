@@ -161,7 +161,7 @@ namespace LiveSplit.PoELoads
     }
 
     /// <summary>
-    /// The two on-screen cues the log cannot provide. Geometry and thresholds come from
+    /// The on-screen cues the log cannot provide. Geometry and thresholds come from
     /// measurements on 1080p recordings (other resolutions are scaled by the capture).
     /// </summary>
     public static class Cues
@@ -175,6 +175,11 @@ namespace LiveSplit.PoELoads
         public const int ContactWidth = 480, ContactHeight = 84, ContactTop = 972, ContactLeft = 700;
         public const float ContactThreshold = 0.7f;
 
+        // character list's top buttons ("log out / options / password"): 1080p y 34..100, x 1280..1900, matched at
+        // half resolution. Measured on race footage: own font ~1.0, the other font ~0.65, any other screen <= 0.1.
+        public const int CharSelectWidth = 620, CharSelectHeight = 66, CharSelectTop = 34, CharSelectLeft = 1280;
+        public const float CharSelectThreshold = 0.8f;
+
         // the Bahnschrift UI font and the default font
         static readonly Template[] banners =
         {
@@ -183,6 +188,11 @@ namespace LiveSplit.PoELoads
         };
         static readonly Template contacting = new Template(Load("contacting.png"));              // whole text
         static readonly Template contactingFontin = new Template(Load("contacting_fontin.png")); // right end of the box
+        static readonly Template[] charSelects =                                               // half resolution
+        {
+            new Template(Load("charselect.png")),
+            new Template(Load("charselect_fontin.png")),
+        };
 
         static Gray Load(string name)
         {
@@ -208,6 +218,13 @@ namespace LiveSplit.PoELoads
             if (scores[best] >= FontLockScore)
                 font = best; // only check the font the player uses from now on
             return scores[best];
+        }
+
+        /// <summary>Character list region at 1080p scale (620x66) -> score.</summary>
+        public static float CharSelectScore(Gray region)
+        {
+            var half = region.Shrink(2);
+            return charSelects.Max(t => t.BestScore(half, 0, 10));
         }
 
         /// <summary>Contacting region at 1080p scale (480x84) -> score.</summary>

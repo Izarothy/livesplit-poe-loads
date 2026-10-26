@@ -8,7 +8,7 @@
     <UseWindowsForms>true</UseWindowsForms>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <GenerateAssemblyInfo>true</GenerateAssemblyInfo>
-    <Version>1.5.0</Version>
+    <Version>1.8.0</Version>
     <Authors>Izarothy</Authors>
     <!-- folder containing LiveSplit.exe: a LiveSplit folder next to this repo, or -p:LiveSplitDir=... -->
     <LiveSplitDir Condition="'$(LiveSplitDir)' == ''">$(MSBuildThisFileDirectory)..\..\LiveSplit</LiveSplitDir>
@@ -33,6 +33,8 @@
     <EmbeddedResource Include="Templates\contacting.png" LogicalName="LiveSplit.PoELoads.Templates.contacting.png" />
     <EmbeddedResource Include="Templates\entering_fontin.png" LogicalName="LiveSplit.PoELoads.Templates.entering_fontin.png" />
     <EmbeddedResource Include="Templates\contacting_fontin.png" LogicalName="LiveSplit.PoELoads.Templates.contacting_fontin.png" />
+    <EmbeddedResource Include="Templates\charselect.png" LogicalName="LiveSplit.PoELoads.Templates.charselect.png" />
+    <EmbeddedResource Include="Templates\charselect_fontin.png" LogicalName="LiveSplit.PoELoads.Templates.charselect_fontin.png" />
   </ItemGroup>
 
   <!-- dotnet build -c Release -p:Install=true copies the component into LiveSplit (close LiveSplit first) -->

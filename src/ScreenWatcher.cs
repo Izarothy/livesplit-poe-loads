@@ -15,9 +15,9 @@ namespace LiveSplit.PoELoads
     }
 
     /// <summary>
-    /// Watches the Path of Exile window for the "Entering" banner (always) and the
-    /// "Contacting server" text (only while a login is in progress), ~60 times a second.
-    /// Only a 960x30 band (plus a 440x80 box during logins) is copied from the screen.
+    /// Watches the Path of Exile window for the "Entering" banner (always), and for the character list and
+    /// the "Contacting server" text (only while a login is in progress), ~60 times a second.
+    /// Only a 960x30 band (plus two small boxes during logins) is copied from the screen.
     /// </summary>
     public sealed class ScreenWatcher : IDisposable
     {
@@ -36,6 +36,7 @@ namespace LiveSplit.PoELoads
         readonly object sync = new object();
         readonly List<Episode> banners = new List<Episode>();
         readonly List<Episode> contacts = new List<Episode>();
+        readonly List<Episode> charSelects = new List<Episode>();
         readonly Queue<(long Tick, float Score)> samples = new Queue<(long, float)>();
         readonly Queue<(long Tick, byte[] Pixels)> images = new Queue<(long, byte[])>();
         readonly Func<IntPtr> findWindow;
@@ -72,7 +73,7 @@ namespace LiveSplit.PoELoads
         /// <summary>Write a troubleshooting report while capturing (null = off).</summary>
         public volatile Diagnostics Diagnostics;
 
-        /// <summary>A login is in progress: also watch for "Contacting server".</summary>
+        /// <summary>A login is in progress: also watch for the character list and "Contacting server".</summary>
         public bool ContactArmed
         {
             get => contactArmed;
@@ -85,6 +86,7 @@ namespace LiveSplit.PoELoads
             {
                 banners.Clear();
                 contacts.Clear();
+                charSelects.Clear();
                 Cues.ResetFont();
                 samples.Clear();
                 images.Clear();
@@ -106,6 +108,13 @@ namespace LiveSplit.PoELoads
                                                        && loadStartTick - e.Onset <= 60000);
                 return match?.Onset;
             }
+        }
+
+        /// <summary>When the character list first appeared after `tick` (a logout), if it was seen within 60 s.</summary>
+        public long? CharSelectAfter(long tick)
+        {
+            lock (sync)
+                return charSelects.FirstOrDefault(e => e.Onset >= tick && e.Onset - tick <= 60000)?.Onset;
         }
 
         /// <summary>Best banner score and number of frames watched in [from, to] (diagnostics).</summary>
@@ -219,7 +228,10 @@ namespace LiveSplit.PoELoads
                                 images.Dequeue();
                         }
                         if (contactArmed)
+                        {
+                            Track(charSelects, Cues.CharSelectScore(capture.CharSelect()), Cues.CharSelectThreshold, Cues.CharSelectThreshold, now);
                             Track(contacts, Cues.ContactScore(capture.Contact()), Cues.ContactThreshold, Cues.ContactThreshold, now);
+                        }
                     }
                 }
             }
@@ -272,12 +284,13 @@ namespace LiveSplit.PoELoads
         [DllImport("winmm.dll", EntryPoint = "timeEndPeriod")] static extern uint TimeEndPeriod(uint ms);
     }
 
-    /// <summary>GDI copies of the two cue regions, scaled to their 1080p size.</summary>
+    /// <summary>GDI copies of the cue regions, scaled to their 1080p size.</summary>
     sealed class Capture : IDisposable
     {
         readonly IntPtr screen = GetDC(IntPtr.Zero);
         readonly Region banner = new Region(Cues.BannerWidth, Cues.BannerHeight);
         readonly Region contact = new Region(Cues.ContactWidth, Cues.ContactHeight);
+        readonly Region charSelect = new Region(Cues.CharSelectWidth, Cues.CharSelectHeight);
         int left, top, width, height;
 
         /// <summary>Find the game's client area on screen; false when minimised.</summary>
@@ -312,6 +325,8 @@ namespace LiveSplit.PoELoads
         public System.Drawing.Rectangle BannerRect => ScreenRect(banner, Cues.BannerLeft, Cues.BannerTop);
 
         public Gray Contact() => Grab(contact, Cues.ContactLeft, Cues.ContactTop);
+
+        public Gray CharSelect() => Grab(charSelect, Cues.CharSelectLeft, Cues.CharSelectTop);
 
         /// <summary>The whole client area as currently captured, scaled to at most `maxWidth` wide (diagnostics).</summary>
         public System.Drawing.Bitmap Frame(int maxWidth)
@@ -356,6 +371,7 @@ namespace LiveSplit.PoELoads
         {
             banner.Dispose();
             contact.Dispose();
+            charSelect.Dispose();
             ReleaseDC(IntPtr.Zero, screen);
         }
 
