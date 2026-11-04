@@ -26,6 +26,7 @@ namespace LiveSplit.PoELoads
         public string Reference = "NA";        // which reference that row uses (References.cs)
         public bool ReferenceGameTime = false; // drive LiveSplit's Game Time with that reference's timer
         public bool WriteDiagnostics = false;  // troubleshooting: report what the screen watcher sees (PoELoads\diagnostics)
+        public bool Hidden = false;            // rows off screen; loads are still tracked (right-click menu toggle)
 
         /// <summary>The configured Client.txt, or the running game's, or a default install location.</summary>
         public string ResolveLogPath()
@@ -58,6 +59,7 @@ namespace LiveSplit.PoELoads
             Add(document, root, "Reference", Reference);
             Add(document, root, "ReferenceGameTime", ReferenceGameTime.ToString());
             Add(document, root, "WriteDiagnostics", WriteDiagnostics.ToString());
+            Add(document, root, "Hidden", Hidden.ToString());
             return root;
         }
 
@@ -75,6 +77,8 @@ namespace LiveSplit.PoELoads
                 ReferenceGameTime = gameTime;
             if (bool.TryParse(node["WriteDiagnostics"]?.InnerText, out var diagnostics))
                 WriteDiagnostics = diagnostics;
+            if (bool.TryParse(node["Hidden"]?.InnerText, out var hidden))
+                Hidden = hidden;
         }
 
         static void Add(XmlDocument document, XmlElement parent, string name, string value)

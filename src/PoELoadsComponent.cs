@@ -25,7 +25,7 @@ namespace LiveSplit.PoELoads
         public string UpdateName => ComponentName;
         public string XMLURL => "";
         public string UpdateURL => "";
-        public Version Version => new Version(1, 8, 0);
+        public Version Version => new Version(1, 9, 0);
     }
 
     /// <summary>One finished transition of the current run.</summary>
@@ -328,16 +328,20 @@ namespace LiveSplit.PoELoads
         // ------------------------------------------------------------------ IComponent
 
         public string ComponentName => "PoE Loads";
-        int RowCount => settings.ShowOnNa ? 5 : 4;
+        // hidden: no rows on screen, tracking and the run file carry on
+        int RowCount => settings.Hidden ? 0 : settings.ShowOnNa ? 5 : 4;
         public float VerticalHeight => RowHeight * RowCount;
-        public float MinimumWidth => 120;
+        public float MinimumWidth => settings.Hidden ? 0 : 120;
         public float HorizontalWidth => 190 * RowCount;
-        public float MinimumHeight => RowHeight;
+        public float MinimumHeight => settings.Hidden ? 0 : RowHeight;
         public float PaddingTop => 0;
         public float PaddingBottom => 0;
         public float PaddingLeft => SidePadding;
         public float PaddingRight => SidePadding;
-        public IDictionary<string, Action> ContextMenuControls => null;
+        public IDictionary<string, Action> ContextMenuControls => new Dictionary<string, Action>
+        {
+            [settings.Hidden ? "Show PoE Loads" : "Hide PoE Loads"] = () => settings.Hidden = !settings.Hidden,
+        };
 
         public void Update(IInvalidator invalidator, LiveSplitState state, float width, float height, LayoutMode mode)
         {
@@ -352,6 +356,8 @@ namespace LiveSplit.PoELoads
 
         public void DrawVertical(Graphics g, LiveSplitState state, float width, Region clipRegion)
         {
+            if (settings.Hidden)
+                return;
             var layout = state.LayoutSettings;
             var detailColumn = DetailColumnWidth(g, layout.TimesFont);
             var y = 0f;
@@ -375,6 +381,8 @@ namespace LiveSplit.PoELoads
 
         public void DrawHorizontal(Graphics g, LiveSplitState state, float height, Region clipRegion)
         {
+            if (settings.Hidden)
+                return;
             var detailColumn = DetailColumnWidth(g, state.LayoutSettings.TimesFont);
             var x = 0f;
             foreach (var row in Rows())
