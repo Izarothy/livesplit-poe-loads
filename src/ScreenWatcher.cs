@@ -307,7 +307,7 @@ namespace LiveSplit.PoELoads
             return true;
         }
 
-        public Gray Banner() => Grab(banner, Cues.BannerLeft, Cues.BannerTop);
+        public Gray Banner() => Grab(banner, Cues.BannerLeft, Cues.BannerTop, Anchor.Centre);
 
         /// <summary>True when the game window, not something on top of it, is at the banner's position.</summary>
         public bool BannerVisible(IntPtr window)
@@ -316,17 +316,22 @@ namespace LiveSplit.PoELoads
             return GetAncestor(WindowFromPoint(new POINT { X = point.X, Y = point.Y }), GA_ROOT) == window;
         }
 
-        public System.Drawing.Point BannerPoint => new System.Drawing.Point(
-            left + (Cues.BannerLeft + Cues.BannerWidth / 2) * width / 1920,
-            top + (Cues.BannerTop + Cues.BannerHeight / 2) * height / 1080);
+        public System.Drawing.Point BannerPoint
+        {
+            get
+            {
+                var r = BannerRect;
+                return new System.Drawing.Point(r.X + r.Width / 2, r.Y + r.Height / 2);
+            }
+        }
 
         public System.Drawing.Rectangle Client => new System.Drawing.Rectangle(left, top, width, height);
 
-        public System.Drawing.Rectangle BannerRect => ScreenRect(banner, Cues.BannerLeft, Cues.BannerTop);
+        public System.Drawing.Rectangle BannerRect => ScreenRect(banner, Cues.BannerLeft, Cues.BannerTop, Anchor.Centre);
 
-        public Gray Contact() => Grab(contact, Cues.ContactLeft, Cues.ContactTop);
+        public Gray Contact() => Grab(contact, Cues.ContactLeft, Cues.ContactTop, Anchor.Centre);
 
-        public Gray CharSelect() => Grab(charSelect, Cues.CharSelectLeft, Cues.CharSelectTop);
+        public Gray CharSelect() => Grab(charSelect, Cues.CharSelectLeft, Cues.CharSelectTop, Anchor.Right);
 
         /// <summary>The whole client area as currently captured, scaled to at most `maxWidth` wide (diagnostics).</summary>
         public System.Drawing.Bitmap Frame(int maxWidth)
@@ -349,16 +354,27 @@ namespace LiveSplit.PoELoads
             }
         }
 
-        // 1080p reference coordinates, scaled to the actual client size (16:9 assumed, as in the video tool)
-        System.Drawing.Rectangle ScreenRect(Region region, int left1080, int top1080) => new System.Drawing.Rectangle(
-            left + left1080 * width / 1920,
-            top + top1080 * height / 1080,
-            region.Width * width / 1920,
-            region.Height * height / 1080);
+        public enum Anchor { Centre, Right }
 
-        Gray Grab(Region region, int left1080, int top1080)
+        /// <summary>
+        /// 1080p reference coordinates on the actual client area. The game sizes its UI by height and pins it
+        /// to the centre or an edge, so any aspect ratio (16:10, 21:9, 32:9...) maps the same way.
+        /// </summary>
+        System.Drawing.Rectangle ScreenRect(Region region, int left1080, int top1080, Anchor anchor)
         {
-            var r = ScreenRect(region, left1080, top1080);
+            var x = anchor == Anchor.Right
+                ? width - (1920 - left1080) * height / 1080
+                : width / 2 + (left1080 - 960) * height / 1080;
+            return new System.Drawing.Rectangle(
+                left + x,
+                top + top1080 * height / 1080,
+                region.Width * height / 1080,
+                region.Height * height / 1080);
+        }
+
+        Gray Grab(Region region, int left1080, int top1080, Anchor anchor)
+        {
+            var r = ScreenRect(region, left1080, top1080, anchor);
             if (r.Width == region.Width && r.Height == region.Height)
                 BitBlt(region.Dc, 0, 0, r.Width, r.Height, screen, r.X, r.Y, SRCCOPY);
             else
